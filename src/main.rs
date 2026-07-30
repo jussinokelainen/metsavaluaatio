@@ -1,0 +1,160 @@
+mod consts;
+mod excel;
+mod geo_utils;
+mod http;
+mod metsakeskus;
+mod mml;
+mod model;
+mod valuation;
+mod wfs;
+
+use crate::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
+use crate::model::Stand;
+use color_eyre::Result;
+use dotenv::dotenv;
+use geo::HasDimensions;
+use proj::Proj;
+use std::env;
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    dotenv().ok();
+
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 3 {
+        eprintln!(
+            "Käyttö: {} <KIINTEISTOTUNNUS> <MUNICIPALITY_NAME>",
+            args.first().map(String::as_str).unwrap_or("forestinfo")
+        );
+        std::process::exit(2);
+    }
+
+    let kiinteistotunnus = &args[1];
+    let municipality_name = &args[2];
+    let mml_api_key = env::var("MML_API_KEY")?;
+
+    println!("Kiinteistötunnus: {kiinteistotunnus}");
+    println!("MML API-key: OK");
+
+    let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
+
+    // ------------------------------------------------------------------
+    // Kiinteistön palstat MML:stä
+    // ------------------------------------------------------------------
+    let property_features = mml::get_property_features(kiinteistotunnus, &mml_api_key)?;
+    println!("Kiinteistöltä löytyi {} palstaa.", property_features.len());
+
+    if property_features.is_empty() {
+        color_eyre::eyre::bail!("Kiinteistölle {kiinteistotunnus} ei löytynyt palstoja MML:stä.");
+    }
+
+    let mut geometries_wgs84 = Vec::new();
+    for feature in &property_features {
+        if let Some(geometry) = geo_utils::feature_to_multipolygon(feature) {
+            if !geometry.is_empty() {
+                geometries_wgs84.push(geometry);
+            }
+        }
+    }
+
+    if geometries_wgs84.is_empty() {
+        color_eyre::eyre::bail!("MML palautti palstat, mutta niillä ei ollut geometriaa.");
+    }
+
+    // Yhdistetään kaikki palstat ja muutetaan ETRS-TM35FINiin.
+    let property_wgs84 = geo_utils::union_all(&geometries_wgs84);
+    let property_geometry = geo_utils::transform(&property_wgs84, &to_tm35);
+
+    println!(
+        "Geometriatyyppi: {}",
+        geo_utils::geometry_type(&property_geometry)
+    );
+    println!(
+        "Pinta-ala: {:.3} ha",
+        geo_utils::area_m2(&property_geometry) / 10_000.0
+    );
+
+    // ------------------------------------------------------------------
+    // Metsävarakuviot Metsäkeskuksen WFS:stä
+    // ------------------------------------------------------------------
+    let stand_layers = wfs::get_layers(SMK_STAND_WFS)?;
+    println!("Metsävarakerroksia löytyi: {}", stand_layers.len());
+
+    let stand_layer = wfs::select_stand_layer(&stand_layers)?;
+    println!("Käytettävä metsävaralayer on {stand_layer}");
+
+    let (min_x, min_y, max_x, max_y) = geo_utils::bounds(&property_geometry)
+        .ok_or_else(|| color_eyre::eyre::eyre!("Kiinteistön geometria on tyhjä."))?;
+    let bbox = format!("{min_x},{min_y},{max_x},{max_y},EPSG:3067");
+
+    println!("Kiinteistön BBOX:");
+    println!("{bbox}");
+
+    let stand_features =
+        wfs::get_features_bbox(SMK_STAND_WFS, &stand_layer, &bbox, EPSG_TM35FIN, 10_000)?;
+    println!("BBOX-alueelta löytyi: {} kuviota", stand_features.len());
+
+    let stands: Vec<Stand> = stand_features
+        .iter()
+        .filter_map(|feature| geo_utils::clip_stand(feature, &property_geometry))
+        .collect();
+
+    println!(
+        "Kiinteistöllä sijaitsevia/leikkaavia metsäkuvioita: {}",
+        stands.len()
+    );
+
+    if stands.is_empty() {
+        color_eyre::eyre::bail!("Kiinteistöltä ei löytynyt yhtään metsäkuviota.");
+    }
+
+    // ------------------------------------------------------------------
+    // Puustotiedot Metsäkeskuksen GeoPackagesta
+    // ------------------------------------------------------------------
+    let gpkg_path = metsakeskus::download_gpkg(municipality_name)?;
+
+    let mut stand_ids: Vec<i64> = stands.iter().filter_map(|stand| stand.standid).collect();
+    stand_ids.sort_unstable();
+    stand_ids.dedup();
+
+    if stand_ids.is_empty() {
+        color_eyre::eyre::bail!("Kuvioilta ei löytynyt standid-tunnuksia.");
+    }
+
+    let (strata, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &stand_ids)?;
+
+    // ------------------------------------------------------------------
+    // Arvon laskenta
+    // ------------------------------------------------------------------
+    let species_summary = valuation::build_species_summary(&strata, &stands)?;
+    let timber_values = valuation::build_timber_values(&species_summary);
+    let stand_values = valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
+    let raw_rows = valuation::build_raw_rows(&strata, &stands)?;
+
+    // ------------------------------------------------------------------
+    // Tulostus
+    // ------------------------------------------------------------------
+    valuation::print_strata_details(&raw_rows, &stand_summaries, &stands);
+    valuation::print_species_values(&species_summary);
+    valuation::print_stand_values(&stand_values);
+    valuation::print_dataset_summary(&stands, &species_summary);
+
+    // ------------------------------------------------------------------
+    // Excel-yhteenveto
+    // ------------------------------------------------------------------
+    let totals = valuation::compute_totals(&stands, &species_summary);
+    let excel_path = "metsävarat_yhteenveto.xlsx";
+    excel::export(
+        excel_path,
+        &totals,
+        &stand_values,
+        &species_summary,
+        &timber_values,
+        &raw_rows,
+    )?;
+
+    let absolute = std::fs::canonicalize(excel_path)?;
+    println!("\nExcel-yhteenveto tallennettu: {}", absolute.display());
+
+    Ok(())
+}

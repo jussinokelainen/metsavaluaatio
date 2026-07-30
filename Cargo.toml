@@ -1,0 +1,18 @@
+[package]
+name = "metsaval"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+color-eyre = "0.6.5"
+dotenv = "0.15.0"
+geo = "0.33.1"
+proj = "0.31.0"
+reqwest = {version = "0.13.5", features = ["blocking", "json", "query"]}
+serde_json = "1.0.151"
+serde = { version = "1", features = ["derive"] }
+geojson = "1.0.0"
+minidom = "0.19.0"
+rusqlite = "0.37"
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
+rust_xlsxwriter = "0.99"
