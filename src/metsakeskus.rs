@@ -39,7 +39,7 @@ pub fn download_gpkg(municipality_name: &str) -> Result<PathBuf> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("metsavarat.gpkg"));
 
-    let temp_dir = std::env::temp_dir().join(format!("metsakeskus_{}", std::process::id()));
+    let temp_dir = std::env::temp_dir().join(format!("metsavaluaatio_{}", std::process::id()));
     fs::create_dir_all(&temp_dir)?;
 
     let gpkg_path = temp_dir.join(file_name);
