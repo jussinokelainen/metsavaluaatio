@@ -51,7 +51,6 @@ fn main() -> Result<()> {
     let mml_api_key = config.api_key;
 
     println!("Kiinteistötunnus: {kiinteistotunnus}");
-    println!("MML API-key: OK");
 
     let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
 
@@ -148,12 +147,7 @@ fn main() -> Result<()> {
     let stand_values = valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
     let raw_rows = valuation::build_raw_rows(&strata, &stands)?;
 
-    // ------------------------------------------------------------------
     // Tulostus
-    // ------------------------------------------------------------------
-    valuation::print_strata_details(&raw_rows, &stand_summaries, &stands);
-    valuation::print_species_values(&species_summary);
-    valuation::print_stand_values(&stand_values);
     valuation::print_dataset_summary(&stands, &species_summary);
 
     // ------------------------------------------------------------------
