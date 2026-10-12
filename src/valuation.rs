@@ -475,7 +475,7 @@ pub fn print_dataset_summary(stands: &[Stand], species_summary: &[SpeciesSummary
         "Metsäkeskuksen kuitupuumäärä: {} m³",
         grouped_precise(pulpwood, 2)
     );
-    println!("LASKENNALLINEN ARVO: {} €", grouped(value));
+    println!("LASKENNALLINEN ARVO: {} €\n", grouped(value));
 }
 
 fn grouped_precise(value: f64, decimals: usize) -> String {

@@ -16,3 +16,4 @@ rusqlite = "0.37"
 zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 rust_xlsxwriter = "0.99"
 toml = "1.1.8"
+quick-xml = "0.42.0"

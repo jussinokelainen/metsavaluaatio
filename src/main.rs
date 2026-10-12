@@ -37,8 +37,6 @@ fn load_config() -> Result<Config> {
 fn main() -> Result<()> {
     color_eyre::install()?;
     let config = load_config()?;
-    let maps_url = "https://www.google.com/mymaps";
-    maps::open_browser(maps_url);
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -142,12 +140,13 @@ fn main() -> Result<()> {
     let stand_values = valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
     let raw_rows = valuation::build_raw_rows(&strata, &stands)?;
 
-    // Maps linkin luonti
-    let kml_path = maps::build_maps_kml();
-    println!("{}", kml_path);
-
     // Tulostus
     valuation::print_dataset_summary(&stands, &species_summary);
+
+    // Maps tason luonti
+    let maps_url = "https://www.google.com/mymaps";
+    maps::open_browser(maps_url);
+    maps::write_kml(stand_features, &property_geometry)?;
 
     // Excel-yhteenveto
     let totals = valuation::compute_totals(&stands, &species_summary);
@@ -162,7 +161,7 @@ fn main() -> Result<()> {
     )?;
 
     let absolute = std::fs::canonicalize(excel_path)?;
-    println!("\nExcel-yhteenveto tallennettu: {}", absolute.display());
+    println!("Excel-yhteenveto tallennettu: {}", absolute.display());
 
     Ok(())
 }
