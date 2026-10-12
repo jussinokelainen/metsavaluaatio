@@ -160,7 +160,7 @@ fn main() -> Result<()> {
     // Excel-yhteenveto
     // ------------------------------------------------------------------
     let totals = valuation::compute_totals(&stands, &species_summary);
-    let excel_path = "metsävarat_yhteenveto.xlsx";
+    let excel_path = "metsävaluaatio.xlsx";
     excel::export(
         excel_path,
         &totals,
