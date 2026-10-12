@@ -2,6 +2,7 @@ mod consts;
 mod excel;
 mod geo_utils;
 mod http;
+mod maps;
 mod metsakeskus;
 mod mml;
 mod model;
@@ -36,6 +37,8 @@ fn load_config() -> Result<Config> {
 fn main() -> Result<()> {
     color_eyre::install()?;
     let config = load_config()?;
+    let maps_url = "https://www.google.com/mymaps";
+    maps::open_browser(maps_url);
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -54,9 +57,7 @@ fn main() -> Result<()> {
 
     let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
 
-    // ------------------------------------------------------------------
     // Kiinteistön palstat MML:stä
-    // ------------------------------------------------------------------
     let property_features = mml::get_property_features(kiinteistotunnus, &mml_api_key)?;
     println!("Kiinteistöltä löytyi {} palstaa.", property_features.len());
 
@@ -90,9 +91,7 @@ fn main() -> Result<()> {
         geo_utils::area_m2(&property_geometry) / 10_000.0
     );
 
-    // ------------------------------------------------------------------
     // Metsävarakuviot Metsäkeskuksen WFS:stä
-    // ------------------------------------------------------------------
     let stand_layers = wfs::get_layers(SMK_STAND_WFS)?;
     println!("Metsävarakerroksia löytyi: {}", stand_layers.len());
 
@@ -124,9 +123,7 @@ fn main() -> Result<()> {
         color_eyre::eyre::bail!("Kiinteistöltä ei löytynyt yhtään metsäkuviota.");
     }
 
-    // ------------------------------------------------------------------
     // Puustotiedot Metsäkeskuksen GeoPackagesta
-    // ------------------------------------------------------------------
     let gpkg_path = metsakeskus::download_gpkg(municipality_name)?;
 
     let mut stand_ids: Vec<i64> = stands.iter().filter_map(|stand| stand.standid).collect();
@@ -139,20 +136,20 @@ fn main() -> Result<()> {
 
     let (strata, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &stand_ids)?;
 
-    // ------------------------------------------------------------------
     // Arvon laskenta
-    // ------------------------------------------------------------------
     let species_summary = valuation::build_species_summary(&strata, &stands)?;
     let timber_values = valuation::build_timber_values(&species_summary);
     let stand_values = valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
     let raw_rows = valuation::build_raw_rows(&strata, &stands)?;
 
+    // Maps linkin luonti
+    let kml_path = maps::build_maps_kml();
+    println!("{}", kml_path);
+
     // Tulostus
     valuation::print_dataset_summary(&stands, &species_summary);
 
-    // ------------------------------------------------------------------
     // Excel-yhteenveto
-    // ------------------------------------------------------------------
     let totals = valuation::compute_totals(&stands, &species_summary);
     let excel_path = "metsävaluaatio.xlsx";
     excel::export(
