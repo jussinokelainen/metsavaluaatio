@@ -10,15 +10,32 @@ mod wfs;
 
 use crate::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
 use crate::model::Stand;
-use color_eyre::Result;
-use dotenv::dotenv;
+use color_eyre::{Result, eyre::eyre};
 use geo::HasDimensions;
 use proj::Proj;
-use std::env;
+use serde::Deserialize;
+use std::{env, fs};
+
+#[derive(Deserialize)]
+struct Config {
+    api_key: String,
+}
+
+fn load_config() -> Result<Config> {
+    if let Some(home_dir) = std::env::home_dir() {
+        let config_file = home_dir.join(".config/metsavaluaatio/config.toml");
+        let content = fs::read_to_string(config_file)?;
+        let config: Config = toml::from_str(&content)?;
+
+        Ok(config)
+    } else {
+        Err(eyre!("Kotihakemiston saaminen epäonnistui"))
+    }
+}
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    dotenv().ok();
+    let config = load_config()?;
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -31,7 +48,7 @@ fn main() -> Result<()> {
 
     let kiinteistotunnus = &args[1];
     let municipality_name = &args[2];
-    let mml_api_key = env::var("MML_API_KEY")?;
+    let mml_api_key = config.api_key;
 
     println!("Kiinteistötunnus: {kiinteistotunnus}");
     println!("MML API-key: OK");
