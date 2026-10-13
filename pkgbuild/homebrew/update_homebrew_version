@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+# This script can be used to update the metsavaluaatio.rb files in this directory,
+# and in the homebrew-metsavaluaatio repository which should be cloned into this
+# directory.
+# The script takes the new version as an argument.
+#
+# Usage example, updating to version 1.2.3:
+# ./update_homebrew_version 1.2.3
+
+VERSION=$1
+shasum=$(curl -L https://github.com/jussinokelainen/metsavaluaatio/archive/refs/tags/"$VERSION".tar.gz | sha256sum)
+shasum=${shasum%% *}
+empty_shasum="d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"
+if [[ "$shasum" == "$empty_shasum" ]]; then
+    printf "\e[31m404\e[0m: https://github.com/jussinokelainen/metsavaluaatio/archive/refs/tags/%s.tar.gz not found.\n" "$VERSION"
+    exit 1
+else
+    printf "New sha256sum: \e[32m%s\e[0m\n" "$shasum"
+fi
+
+read -p "Update formula files? [y/n] " -r
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 0
+fi
+
+cat <<EOF >metsavaluaatio.rb
+class Metsavaluaatio < Formula
+  desc "Työkalu metsän tietojen analysointiin"
+  homepage "https://github.com/jussinokelainen/metsavaluaatio"
+  url "https://github.com/jussinokelainen/metsavaluaatio/archive/refs/tags/$VERSION.tar.gz"
+  sha256 "$shasum"
+  license "AGPL-3.0-only"
+
+  depends_on "rust" => :build
+  depends_on "cmake" => :build
+
+  def install
+    system "cargo", "install", *std_cargo_args
+  end
+end
+EOF
+
+cp ./metsavaluaatio.rb ./homebrew-metsavaluaatio/Formula/metsavaluaatio.rb
+echo "Formula files updated."
+
+message="Updated to version $VERSION"
+printf "Commit new metsavaluaatio.rb in homebrew-metsavaluaatio with message '\e[32m%s\e[0m'?" "$message"
+read -p " [y/n] " -r
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 0
+fi
+
+cd ./homebrew-metsavaluaatio/ || exit
+git add ./Formula/metsavaluaatio.rb
+git commit -m "$message"
+git push

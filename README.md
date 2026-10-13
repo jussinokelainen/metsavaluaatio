@@ -4,17 +4,20 @@ METSÄVALUAATIO
 Asennus
 -------
 
+#### macOS (homebrew):
+```bash
+brew tap jussinokelainen/metsavaluaatio
+brew trust jussinokelainen/metsavaluaatio
+brew install metsavaluaatio
+```
+
+Manuaalisesti:
+
 ```bash
 git clone git@github.com:jussinokelainen/metsavaluaatio.git
 cd metsavaluaatio
 make
 sudo make install
-```
-
-Asennus jos käytössä macOS, jotta asennus ei
-epäonnistu käyttöoikeuksien takia:
-```bash
-sudo make install PREFIX=/usr/local
 ```
 
 Riippuvuudet:
@@ -52,6 +55,7 @@ Klikkaa lisätyn tason yläpuolella 'Share' ja nimeä kartta -> valtuuta kaikki 
 Ohjelman poistaminen
 --------------------
 
+Package managerin avulla, tai manuaalisen asennuksen jälkeen:
 ```bash
 sudo make uninstall
 ```

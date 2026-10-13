@@ -2,3 +2,6 @@ target/
 .env
 *.xlsx
 *.kml
+
+# pkgbuild files
+pkgbuild/homebrew/homebrew-metsavaluaatio
