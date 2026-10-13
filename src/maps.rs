@@ -1,4 +1,4 @@
-use crate::{EPSG_TM35FIN, EPSG_WGS84, geo_utils, metsakeskus};
+use crate::{EPSG_TM35FIN, EPSG_WGS84, geo_utils, metsakeskus, model::StandSummary};
 use color_eyre::Result;
 use geo::{BooleanOps, MultiPolygon, Polygon};
 use geojson::Feature;
@@ -7,8 +7,53 @@ use rand::RngExt;
 use std::path::PathBuf;
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
-fn create_placemark(property: &Polygon<f64>, stand_id: i64) -> String {
-    let mut kml = format!(
+fn create_placemark(property: &Polygon<f64>, stand_summary: &StandSummary) -> String {
+    // luo uusi placemarkin alku
+    let mut kml = new_placemark_start(stand_summary.standid.to_string());
+
+    // lisää data tiedostoon
+    kml.push_str("            <ExtendedData>\n");
+
+    kml.push_str(&new_data("Keski-ikä", stand_summary.meanage));
+    kml.push_str(&new_data("Runkoluku", stand_summary.stemcount));
+    kml.push_str(&new_data("Keskiläpimitta", stand_summary.meandiameter));
+    kml.push_str(&new_data("Keskipituus", stand_summary.meanheight));
+    kml.push_str(&new_data(
+        "Tilavuuskasvuprosentti",
+        stand_summary.volumegrowth,
+    ));
+
+    kml.push_str("            </ExtendedData>\n");
+
+    // lisää koordinaatit tiedostoon
+    kml.push_str("            <Polygon><outerBoundaryIs><LinearRing><coordinates>\n");
+    for coord in property.exterior().coords() {
+        kml.push_str(&format!("                {},{},0\n", coord.x, coord.y));
+    }
+    kml.push_str(
+        "            </coordinates></LinearRing></outerBoundaryIs></Polygon>
+        </Placemark>\n",
+    );
+
+    kml
+}
+
+/// Luo placemarkkiin lisättävän <Data> kentän annetulla nimellä ja arvolla
+fn new_data(name: &str, value: Option<f64>) -> String {
+    if let Some(data) = value {
+        format!(
+            "                <Data name=\"{name}\">
+                    <value>{data}</value>
+                </Data>\n"
+        )
+    } else {
+        String::new()
+    }
+}
+
+/// Luo uuden placemarkin alun satunnaisella värillä ja annetulla nimellä
+fn new_placemark_start(name: String) -> String {
+    format!(
         "        <Placemark>
             <name>{}</name>
             <Style>
@@ -17,22 +62,10 @@ fn create_placemark(property: &Polygon<f64>, stand_id: i64) -> String {
                     <fill>1</fill>
                     <outline>1</outline>
                 </PolyStyle>
-            </Style>
-            <Polygon><outerBoundaryIs><LinearRing><coordinates>\n",
-        xml_escape(&stand_id.to_string()),
+            </Style>\n",
+        xml_escape(&name),
         random_color()
-    );
-
-    for coord in property.exterior().coords() {
-        kml.push_str(&format!("                {},{},0\n", coord.x, coord.y));
-    }
-
-    kml.push_str(
-        "            </coordinates></LinearRing></outerBoundaryIs></Polygon>
-        </Placemark>\n",
-    );
-
-    kml
+    )
 }
 
 /// Muuttaa merkkijonon xml-kelpoiseksi
@@ -110,18 +143,13 @@ pub fn write_kml(
             continue;
         };
 
-        let (strata, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &[stand_id])?;
-        println!("=====================");
-        strata.iter().for_each(|s| println!("{:?}", s));
-        println!("---------------------");
-        stand_summaries.iter().for_each(|s| println!("{:?}", s));
-        println!("=====================");
+        let (_, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &[stand_id])?;
 
         let to_wgs84 = Proj::new_known_crs(EPSG_TM35FIN, EPSG_WGS84, None)?;
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
-            kml.push_str(&create_placemark(polygon, stand_id));
+            kml.push_str(&create_placemark(polygon, &stand_summaries[0]));
         }
     }
 
