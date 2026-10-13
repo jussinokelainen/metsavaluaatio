@@ -1,29 +1,36 @@
-use crate::{EPSG_TM35FIN, EPSG_WGS84, geo_utils};
+use crate::{EPSG_TM35FIN, EPSG_WGS84, geo_utils, metsakeskus};
 use color_eyre::Result;
 use geo::{BooleanOps, MultiPolygon, Polygon};
 use geojson::Feature;
 use proj::Proj;
+use rand::RngExt;
+use std::path::PathBuf;
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
-fn create_placemark(feature: &Feature, property: &Polygon<f64>) -> String {
-    let name = feature
-        .properties
-        .as_ref()
-        .and_then(|properties| properties.get("K_TUNNUS"))
-        .map(|value| value.to_string())
-        .unwrap_or_else(|| "Unknown stand".to_string());
-
+fn create_placemark(property: &Polygon<f64>, stand_id: i64) -> String {
     let mut kml = format!(
-        "<Placemark><name>{}</name><Polygon>\
-         <outerBoundaryIs><LinearRing><coordinates>",
-        xml_escape(&name)
+        "        <Placemark>
+            <name>{}</name>
+            <Style>
+                <PolyStyle>
+                    <color>7f{}</color>
+                    <fill>1</fill>
+                    <outline>1</outline>
+                </PolyStyle>
+            </Style>
+            <Polygon><outerBoundaryIs><LinearRing><coordinates>\n",
+        xml_escape(&stand_id.to_string()),
+        random_color()
     );
 
     for coord in property.exterior().coords() {
-        kml.push_str(&format!("{},{},0 ", coord.x, coord.y));
+        kml.push_str(&format!("                {},{},0\n", coord.x, coord.y));
     }
 
-    kml.push_str("</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>");
+    kml.push_str(
+        "            </coordinates></LinearRing></outerBoundaryIs></Polygon>
+        </Placemark>\n",
+    );
 
     kml
 }
@@ -36,6 +43,21 @@ fn xml_escape(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+/// Antaa satunnaisen hex värikoodin
+fn random_color() -> &'static str {
+    let colors = [
+        "75b8f6", "77dd77", "87e0cf", "89cff0", "90ee90", "98ff98", "99c5c4", "9adedb", "a2bffe",
+        "ace1af", "add8e6", "b2fba5", "b39eb5", "bdb0d0", "bee7a5", "c8a2c8", "cb99c9", "cef0cc",
+        "d2f0e0", "d8a1c4", "d9bbc8", "dcd0ff", "ddf3c2", "dea5a4", "f08080", "f3e5ab", "f49ac2",
+        "f4c2c2", "f7cac1", "fdfd96", "ff6961", "ff91a4", "ff964f", "ffb6c1", "ffbcd9", "ffddf4",
+        "ffe4e1", "fffaa0", "fffacd",
+    ];
+    let mut rng = rand::rng();
+    let idx = rng.random_range(0..colors.len());
+
+    colors[idx]
 }
 
 /// Palauttaa metsäkuvion jos se on annetulla palstalla, muuten palauttaa None
@@ -66,11 +88,13 @@ pub fn write_kml(
     features: Vec<Feature>,
     property: &MultiPolygon<f64>,
     file_path: &str,
+    gpkg_path: PathBuf,
 ) -> Result<()> {
     let mut kml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>"#,
+    <Document>
+"#,
     );
 
     for feature in &features {
@@ -78,15 +102,33 @@ pub fn write_kml(
             continue;
         };
 
+        let Some(stand) = geo_utils::clip_stand(feature, property) else {
+            continue;
+        };
+
+        let Some(stand_id) = stand.standid else {
+            continue;
+        };
+
+        let (strata, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &[stand_id])?;
+        println!("=====================");
+        strata.iter().for_each(|s| println!("{:?}", s));
+        println!("---------------------");
+        stand_summaries.iter().for_each(|s| println!("{:?}", s));
+        println!("=====================");
+
         let to_wgs84 = Proj::new_known_crs(EPSG_TM35FIN, EPSG_WGS84, None)?;
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
-            kml.push_str(&create_placemark(feature, polygon));
+            kml.push_str(&create_placemark(polygon, stand_id));
         }
     }
 
-    kml.push_str("</Document></kml>");
+    kml.push_str(
+        "    </Document>
+</kml>",
+    );
 
     std::fs::write(&file_path, kml)?;
     println!("Google maps taso: {file_path}");

@@ -1241,6 +1241,7 @@ dependencies = [
  "minidom",
  "proj",
  "quick-xml",
+ "rand",
  "reqwest",
  "rusqlite",
  "rust_xlsxwriter",

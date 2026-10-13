@@ -164,7 +164,7 @@ fn main() -> Result<()> {
     let maps_url = "https://www.google.com/mymaps";
     let kml_file = generate_filename(property_id, ".kml");
     maps::open_browser(maps_url);
-    maps::write_kml(stand_features, &property_geometry, &kml_file)?;
+    maps::write_kml(stand_features, &property_geometry, &kml_file, gpkg_path)?;
 
     // Excel-yhteenveto
     let totals = valuation::compute_totals(&stands, &species_summary);
