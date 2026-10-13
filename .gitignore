@@ -5,3 +5,5 @@ target/
 
 # pkgbuild files
 pkgbuild/homebrew/homebrew-metsavaluaatio
+pkgbuild/arch/*/
+pkgbuild/arch/*.pkg.tar.zst

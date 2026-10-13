@@ -4,6 +4,13 @@ METSÄVALUAATIO
 Asennus
 -------
 
+#### Arch linux:
+```bash
+git clone git@github.com:jussinokelainen/metsavaluaatio.git
+cd metsavaluaatio/pkgbuild/arch
+makepkg -si
+```
+
 #### macOS (homebrew):
 ```bash
 brew tap jussinokelainen/metsavaluaatio
