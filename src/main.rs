@@ -11,6 +11,7 @@ mod wfs;
 
 use crate::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
 use crate::model::Stand;
+use chrono::{Local, SubsecRound};
 use color_eyre::{Result, eyre::eyre};
 use geo::HasDimensions;
 use proj::Proj;
@@ -34,6 +35,22 @@ fn load_config() -> Result<Config> {
     }
 }
 
+fn generate_filename(property_id: &String, suffix: &str) -> String {
+    let mut time = Local::now().trunc_subsecs(0).to_rfc3339().replace(":", "-");
+
+    // Poistaa ajasta kellonajan aikavyöhykkeen (esim 'T08-00-00 +0300')
+    if let Some(pos) = time.find('T') {
+        time.truncate(pos);
+    }
+
+    let mut filename = property_id.clone();
+    filename.push_str("__");
+    filename.push_str(&time);
+    filename.push_str(suffix);
+
+    filename
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let config = load_config()?;
@@ -47,20 +64,20 @@ fn main() -> Result<()> {
         std::process::exit(2);
     }
 
-    let kiinteistotunnus = &args[1];
+    let property_id = &args[1];
     let municipality_name = &args[2];
     let mml_api_key = config.api_key;
 
-    println!("Kiinteistötunnus: {kiinteistotunnus}");
+    println!("Kiinteistötunnus: {property_id}");
 
     let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
 
     // Kiinteistön palstat MML:stä
-    let property_features = mml::get_property_features(kiinteistotunnus, &mml_api_key)?;
+    let property_features = mml::get_property_features(property_id, &mml_api_key)?;
     println!("Kiinteistöltä löytyi {} palstaa.", property_features.len());
 
     if property_features.is_empty() {
-        color_eyre::eyre::bail!("Kiinteistölle {kiinteistotunnus} ei löytynyt palstoja MML:stä.");
+        color_eyre::eyre::bail!("Kiinteistölle {property_id} ei löytynyt palstoja MML:stä.");
     }
 
     let mut geometries_wgs84 = Vec::new();
@@ -145,14 +162,15 @@ fn main() -> Result<()> {
 
     // Maps tason luonti
     let maps_url = "https://www.google.com/mymaps";
+    let kml_file = generate_filename(property_id, ".kml");
     maps::open_browser(maps_url);
-    maps::write_kml(stand_features, &property_geometry)?;
+    maps::write_kml(stand_features, &property_geometry, &kml_file)?;
 
     // Excel-yhteenveto
     let totals = valuation::compute_totals(&stands, &species_summary);
-    let excel_path = "metsävaluaatio.xlsx";
+    let excel_file = generate_filename(property_id, ".xlsx");
     excel::export(
-        excel_path,
+        &excel_file,
         &totals,
         &stand_values,
         &species_summary,
@@ -160,7 +178,7 @@ fn main() -> Result<()> {
         &raw_rows,
     )?;
 
-    let absolute = std::fs::canonicalize(excel_path)?;
+    let absolute = std::fs::canonicalize(excel_file)?;
     println!("Excel-yhteenveto tallennettu: {}", absolute.display());
 
     Ok(())
