@@ -44,6 +44,11 @@ kuten yllä olevassa esimerkissä.
 Tuottaa .xlsx ja .kml tiedostot siihen hakemistoon jossa se ajetaan, ja
 avaa selaimen osoitteessa jossa .kml tiedostosta voi tehdä karttatason.
 
+#### Kartan luominen:
+Selaimessa klikkaa 'Create new map' -> Vasemalla olevassa ikkunassa 'Untitled layer' alapuolella klikkaa 'import' -> Upload -> Valitse ohjelman luoma .kml tiedosto
+
+Klikkaa lisätyn tason yläpuolella 'Share' ja nimeä kartta -> valtuuta kaikki kenellä on linkki avaamaan kartta -> kopioi linkki alareunasta
+
 Ohjelman poistaminen
 --------------------
 
