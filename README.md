@@ -7,14 +7,13 @@ Asennus
 ```bash
 git clone git@github.com:jussinokelainen/metsavaluaatio.git
 cd metsavaluaatio
+make
 sudo make install
 ```
 
 Asennus jos käytössä macOS, jotta asennus ei
 epäonnistu käyttöoikeuksien takia:
 ```bash
-git clone git@github.com:jussinokelainen/metsavaluaatio.git
-cd metsavaluaatio
 sudo make install PREFIX=/usr/local
 ```
 
