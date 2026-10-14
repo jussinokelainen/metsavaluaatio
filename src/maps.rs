@@ -22,6 +22,14 @@ fn create_placemark(property: &Polygon<f64>, stand_summary: &StandSummary) -> St
         "Tilavuuskasvuprosentti",
         stand_summary.volumegrowth,
     ));
+    if let Some(saw_vol) = stand_summary.sawlogvolume
+        && let Some(pulp_vol) = stand_summary.pulpwoodvolume
+    {
+        // Kerrotaan arvo 10000:lla josta floor() ja jaetaan 100:lla jotta
+        // prosenttiarvo on 2 desimaalin tarkkuudella
+        let saw_perc = ((saw_vol / (saw_vol + pulp_vol)) * 10000.0).floor() / 100.0;
+        kml.push_str(&new_data("Tukkiprosentti", Some(saw_perc)));
+    }
 
     kml.push_str("            </ExtendedData>\n");
 
