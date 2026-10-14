@@ -30,29 +30,34 @@ sudo make install
 Riippuvuudet:
 ```bash
 rust
-make
 cmake
 ```
 
 Käyttö
 ------
 
-Ennen ohjelman käyttöä, luo tiedosto ~/.config/metsavaluaatio/config.toml jossa
-on henkilökohtainen MML api avain.
-```toml
-api_key = "12345678-90ab-cdef-ghij-klmnopqrstuv"
+Ennen ohjelman varsinaista käyttöä täytyy lisätä henkilökohtainen MML api-avain.
+Tämän voi joko tehdä itse luomalla tiedosto ~/.config/metsavaluaatio/config.toml
+johon lisätään kenttä `api-key = "<api-key>"`, tai komennolla
+```bash
+metsaval --aseta-api <api-key>
 ```
 
 Api-avaimen lisäämisen jälkeen ohjelman käyttö:
 
 ```bash
-metsaval 123-456-7890-1234 Kunta
+metsaval 012-345-0006-0789
 ```
 
-Ohjelma vaatii parametreina kiinteistötunnuksen ja kunnan,
-kuten yllä olevassa esimerkissä.
-Tuottaa .xlsx ja .kml tiedostot siihen hakemistoon jossa se ajetaan, ja
+Ohjelma vaatii parametrina kiinteistötunnuksen kuten yllä olevassa esimerkissä.
+Tämä tuottaa .xlsx ja .kml tiedostot siihen hakemistoon jossa se ajetaan, ja
 avaa selaimen osoitteessa jossa .kml tiedostosta voi tehdä karttatason.
+
+lisätietoja muista ominaisuuksista saa komennolla
+
+```bash
+metsaval --help
+```
 
 #### Kartan luominen:
 Selaimessa klikkaa 'Create new map' -> Vasemalla olevassa ikkunassa 'Untitled layer' alapuolella klikkaa 'import' -> Upload -> Valitse ohjelman luoma .kml tiedosto
