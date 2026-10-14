@@ -142,16 +142,33 @@ fn remove_municipality(key: String) {
     save_municipalities(municipalities);
 }
 
+fn list_municipalities() {
+    todo!()
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let config = load_config()?;
 
     let flags = flagger::Flagset {
-        flags: Vec::new(),
+        flags: vec!["h", "help", "kunta-lista"],
         value_flags: vec!["aseta-api", "poista-kunta"],
         opt_flags: Vec::new(),
     };
     let args = flagger::parse_args(flags, None)?;
+    for flag in args.flags {
+        match flag.as_str() {
+            "h" | "help" => {
+                print_help();
+                return Ok(());
+            }
+            "kunta-lista" => {
+                list_municipalities();
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
     for (flag, value) in args.valued_flags {
         match flag.as_str() {
             "aseta-api" => {
@@ -167,7 +184,10 @@ fn main() -> Result<()> {
     }
 
     if args.normal_str.len() != 1 {
-        eprintln!("Käyttö: metsaval <KIINTEISTOTUNNUS>");
+        eprintln!(
+            "Käyttö: metsaval <KIINTEISTÖTUNNUS>
+    Lisätietoja: metsaval --help"
+        );
         std::process::exit(2);
     }
 
@@ -309,4 +329,18 @@ fn main() -> Result<()> {
     maps::open_browser(maps_url);
 
     Ok(())
+}
+
+fn print_help() {
+    println!(
+        "METSÄVALUAATIO
+    Käyttö: metsaval <KIINTEISTÖTUNNUS> [-h | --help] [--kunta-lista] [--aseta-api <api>] [--poista-kunta <koodi>]
+
+        --help, -h     | Näytä tämä viesti
+        --kunta-lista  | listaa kaikki tallennetut kunnat ja niiden 3-numeroiset koodit
+        --aseta-api    | asettaa MML api-avaimen ohjelman config.toml tiedostoon
+        --poista-kunta | poistaa kunnan ja sen 3-numeroisen koodin tallennettujen kuntien
+                       | listasta. Argumenttina vaatii 3-numeroisen koodin, ei kunnan nimeä
+"
+    );
 }
