@@ -1,5 +1,6 @@
 mod consts;
 mod excel;
+mod flagger;
 mod geo_utils;
 mod http;
 mod maps;
@@ -16,16 +17,25 @@ use color_eyre::{Result, eyre::eyre};
 use geo::HasDimensions;
 use proj::Proj;
 use serde::Deserialize;
-use std::{env, fs};
+use std::{fs, path::PathBuf};
 
 #[derive(Deserialize)]
 struct Config {
     api_key: String,
 }
 
-fn load_config() -> Result<Config> {
+fn config_file_path() -> Option<PathBuf> {
     if let Some(home_dir) = std::env::home_dir() {
-        let config_file = home_dir.join(".config/metsavaluaatio/config.toml");
+        let config_dir = home_dir.join(".config/metsavaluaatio");
+        fs::create_dir_all(&config_dir).ok()?;
+        Some(config_dir.join("config.toml"))
+    } else {
+        None
+    }
+}
+
+fn load_config() -> Result<Config> {
+    if let Some(config_file) = config_file_path() {
         let content = fs::read_to_string(config_file)?;
         let config: Config = toml::from_str(&content)?;
 
@@ -33,6 +43,18 @@ fn load_config() -> Result<Config> {
     } else {
         Err(eyre!("Kotihakemiston saaminen epäonnistui"))
     }
+}
+
+fn set_api(key: String) -> Result<()> {
+    if let Some(config_file) = config_file_path() {
+        let api_string = format!("api_key = \"{key}\"");
+        fs::write(&config_file, api_string)?;
+        println!(
+            "API avain onnistuneesti tallennettu tiedostoon {}",
+            config_file.display()
+        );
+    }
+    Ok(())
 }
 
 fn generate_filename(property_id: &String, suffix: &str) -> String {
@@ -55,17 +77,29 @@ fn main() -> Result<()> {
     color_eyre::install()?;
     let config = load_config()?;
 
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 3 {
-        eprintln!(
-            "Käyttö: {} <KIINTEISTOTUNNUS> <MUNICIPALITY_NAME>",
-            args.first().map(String::as_str).unwrap_or("forestinfo")
-        );
+    let flags = flagger::Flagset {
+        flags: Vec::new(),
+        value_flags: vec!["set-api-key"],
+        opt_flags: Vec::new(),
+    };
+    let args = flagger::parse_args(flags, None)?;
+    for (flag, value) in args.valued_flags {
+        match flag.as_str() {
+            "set-api-key" => {
+                set_api(value)?;
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    if args.normal_str.len() != 2 {
+        eprintln!("Käyttö: metsaval <KIINTEISTOTUNNUS> <MUNICIPALITY_NAME>");
         std::process::exit(2);
     }
 
-    let property_id = &args[1];
-    let municipality_name = &args[2];
+    let property_id = &args.normal_str[0];
+    let municipality_name = &args.normal_str[1];
     let mml_api_key = config.api_key;
 
     println!("Kiinteistötunnus: {property_id}");
