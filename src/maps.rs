@@ -1,4 +1,6 @@
-use crate::{EPSG_TM35FIN, EPSG_WGS84, geo_utils, metsakeskus, model::StandSummary};
+use crate::consts::Cutting;
+use crate::model::StandSummary;
+use crate::{EPSG_TM35FIN, EPSG_WGS84, Stand, geo_utils, metsakeskus};
 use color_eyre::Result;
 use geo::{BooleanOps, MultiPolygon, Polygon};
 use geojson::Feature;
@@ -7,28 +9,30 @@ use rand::RngExt;
 use std::path::PathBuf;
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
-fn create_placemark(property: &Polygon<f64>, stand_summary: &StandSummary) -> String {
+fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Stand) -> String {
     // luo uusi placemarkin alku
-    let mut kml = new_placemark_start(stand_summary.standid.to_string());
+    let mut kml = new_placemark_start(summary.standid.to_string());
 
     // lisää data tiedostoon
     kml.push_str("            <ExtendedData>\n");
 
-    kml.push_str(&new_data("Keski-ikä", stand_summary.meanage));
-    kml.push_str(&new_data("Runkoluku", stand_summary.stemcount));
-    kml.push_str(&new_data("Keskiläpimitta", stand_summary.meandiameter));
-    kml.push_str(&new_data("Keskipituus", stand_summary.meanheight));
-    kml.push_str(&new_data(
-        "Tilavuuskasvuprosentti",
-        stand_summary.volumegrowth,
-    ));
-    if let Some(saw_vol) = stand_summary.sawlogvolume
-        && let Some(pulp_vol) = stand_summary.pulpwoodvolume
+    kml.push_str(&new_data("Pinta-ala (ha)", stand.area));
+    kml.push_str(&new_data("Runkoluku kpl/ha", summary.stemcount));
+    kml.push_str(&new_data("Keski-ikä", summary.meanage));
+    kml.push_str(&new_data("Keskiläpimitta", summary.meandiameter));
+    kml.push_str(&new_data("Keskipituus", summary.meanheight));
+    kml.push_str(&new_data("Tilavuuskasvuprosentti", summary.volumegrowth));
+    if let Some(saw_vol) = summary.sawlogvolume
+        && let Some(pulp_vol) = summary.pulpwoodvolume
     {
         // Kerrotaan arvo 10000:lla josta floor() ja jaetaan 100:lla jotta
         // prosenttiarvo on 2 desimaalin tarkkuudella
         let saw_perc = ((saw_vol / (saw_vol + pulp_vol)) * 10000.0).floor() / 100.0;
         kml.push_str(&new_data("Tukkiprosentti", Some(saw_perc)));
+    }
+    if let Some(cutting) = stand.cutting() {
+        kml.push_str(&new_data("Hakkuuehdotus", Some(Cutting::name(cutting))));
+        kml.push_str(&new_data("Ehdotusvuosi", stand.cuttingproposalyear));
     }
 
     kml.push_str("            </ExtendedData>\n");
@@ -47,7 +51,7 @@ fn create_placemark(property: &Polygon<f64>, stand_summary: &StandSummary) -> St
 }
 
 /// Luo placemarkkiin lisättävän <Data> kentän annetulla nimellä ja arvolla
-fn new_data(name: &str, value: Option<f64>) -> String {
+fn new_data<T: std::fmt::Display>(name: &str, value: Option<T>) -> String {
     if let Some(data) = value {
         format!(
             "                <Data name=\"{name}\">
@@ -90,10 +94,10 @@ fn xml_escape(value: &str) -> String {
 fn random_color() -> &'static str {
     let colors = [
         "75b8f6", "77dd77", "87e0cf", "89cff0", "90ee90", "98ff98", "99c5c4", "9adedb", "a2bffe",
-        "ace1af", "add8e6", "b2fba5", "b39eb5", "bdb0d0", "bee7a5", "c8a2c8", "cb99c9", "cef0cc",
-        "d2f0e0", "d8a1c4", "d9bbc8", "dcd0ff", "ddf3c2", "dea5a4", "f08080", "f3e5ab", "f49ac2",
-        "f4c2c2", "f7cac1", "fdfd96", "ff6961", "ff91a4", "ff964f", "ffb6c1", "ffbcd9", "ffddf4",
-        "ffe4e1", "fffaa0", "fffacd",
+        "ace1af", "add8e6", "b2fba5", "b39eb5", "bdb0d0", "bee7a5", "cb99c9", "cef0cc", "d2f0e0",
+        "d8a1c4", "d9bbc8", "dcd0ff", "ddf3c2", "dea5a4", "f08080", "f3e5ab", "f49ac2", "f4c2c2",
+        "f7cac1", "fdfd96", "ff6961", "ff91a4", "ff964f", "ffb6c1", "ffbcd9", "ffddf4", "ffe4e1",
+        "fffaa0", "fffacd",
     ];
     let mut rng = rand::rng();
     let idx = rng.random_range(0..colors.len());
@@ -157,7 +161,7 @@ pub fn write_kml(
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
-            kml.push_str(&create_placemark(polygon, &stand_summaries[0]));
+            kml.push_str(&create_placemark(polygon, &stand_summaries[0], &stand));
         }
     }
 

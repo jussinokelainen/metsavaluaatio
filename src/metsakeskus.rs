@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 /// Hakee kunnan metsävarakuviot Metsäkeskuksesta ja purkaa GeoPackagen
 /// väliaikaistiedostoon.
 pub fn download_gpkg(municipality_name: &str) -> Result<PathBuf> {
+    println!("Haetaan GeoPackage kunnalle {municipality_name}...");
     let url = format!("{MUNICIPALITY_ZIP_BASE}{municipality_name}.zip");
     let bytes = http::get_bytes(&url, &[], 300)?;
 
