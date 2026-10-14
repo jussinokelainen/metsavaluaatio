@@ -161,9 +161,7 @@ fn main() -> Result<()> {
     valuation::print_dataset_summary(&stands, &species_summary);
 
     // Maps tason luonti
-    let maps_url = "https://www.google.com/mymaps";
     let kml_file = generate_filename(property_id, ".kml");
-    maps::open_browser(maps_url);
     maps::write_kml(stand_features, &property_geometry, &kml_file, gpkg_path)?;
 
     // Excel-yhteenveto
@@ -180,6 +178,10 @@ fn main() -> Result<()> {
 
     let absolute = std::fs::canonicalize(excel_file)?;
     println!("Excel-yhteenveto tallennettu: {}", absolute.display());
+
+    // Avaa selain kartan luonti sivulla
+    let maps_url = "https://www.google.com/mymaps";
+    maps::open_browser(maps_url);
 
     Ok(())
 }
