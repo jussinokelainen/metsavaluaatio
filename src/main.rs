@@ -17,7 +17,7 @@ use color_eyre::{Result, eyre::eyre};
 use geo::HasDimensions;
 use proj::Proj;
 use serde::Deserialize;
-use std::{fs, path::PathBuf};
+use std::{collections::HashMap, fs, fs::read_to_string, path::PathBuf};
 
 #[derive(Deserialize)]
 struct Config {
@@ -34,6 +34,7 @@ fn config_file_path() -> Option<PathBuf> {
     }
 }
 
+/// Hakee ohjelman config.toml tiedoston
 fn load_config() -> Result<Config> {
     if let Some(config_file) = config_file_path() {
         let content = fs::read_to_string(config_file)?;
@@ -45,6 +46,7 @@ fn load_config() -> Result<Config> {
     }
 }
 
+/// Tallentaa annetun avaimen ohjelman config.toml tiedostoon
 fn set_api(key: String) -> Result<()> {
     if let Some(config_file) = config_file_path() {
         let api_string = format!("api_key = \"{key}\"");
@@ -53,14 +55,17 @@ fn set_api(key: String) -> Result<()> {
             "API avain onnistuneesti tallennettu tiedostoon {}",
             config_file.display()
         );
+    } else {
+        println!("API avaimen tallentaminen epäonnistui (hakemiston luominen epäonnistui)");
     }
     Ok(())
 }
 
+/// Generoi ohjelman tuottamille tiedostoille nimen
 fn generate_filename(property_id: &String, suffix: &str) -> String {
     let mut time = Local::now().trunc_subsecs(0).to_rfc3339().replace(":", "-");
 
-    // Poistaa ajasta kellonajan aikavyöhykkeen (esim 'T08-00-00 +0300')
+    // Poistaa ajasta kellonajan ja aikavyöhykkeen (esim 'T08-00-00 +0300')
     if let Some(pos) = time.find('T') {
         time.truncate(pos);
     }
@@ -71,6 +76,66 @@ fn generate_filename(property_id: &String, suffix: &str) -> String {
     filename.push_str(suffix);
 
     filename
+}
+
+fn municipality_file() -> Option<PathBuf> {
+    if let Some(home_dir) = std::env::home_dir() {
+        let local_dir = home_dir.join(".local/share/metsavaluaatio");
+        fs::create_dir_all(&local_dir).ok()?;
+        Some(local_dir.join("municipalities.json"))
+    } else {
+        None
+    }
+}
+
+/// Hakee tallennetut kunnat
+fn load_municipalities() -> HashMap<String, String> {
+    if let Some(path) = municipality_file() {
+        if let Some(json) = read_to_string(path).ok() {
+            if let Some(parsed_content) = serde_json::from_str(&json).ok() {
+                parsed_content
+            } else {
+                HashMap::new()
+            }
+        } else {
+            HashMap::new()
+        }
+    } else {
+        HashMap::new()
+    }
+}
+
+/// Tallentaa kunnat
+fn save_municipalities(municipalities: HashMap<String, String>) {
+    if let Some(path) = municipality_file() {
+        match serde_json::to_string_pretty(&municipalities) {
+            Ok(json) => match fs::write(path, json) {
+                Ok(_) => {
+                    println!("Uusi kunta tallennettu.")
+                }
+                Err(_) => {}
+            },
+            Err(_) => {}
+        }
+    }
+}
+
+/// Kysyy käyttäjältä kunnan, joka kyseiseen koodiin liitetään
+fn ask_municipality() -> String {
+    use std::io::{Write, stdin, stdout};
+    let mut s = String::new();
+    print!("Syötä kunta: ");
+    let _ = stdout().flush();
+    stdin().read_line(&mut s).expect("Virheellinen syöte");
+
+    if let Some('\n') = s.chars().next_back() {
+        s.pop();
+    }
+    if let Some('\r') = s.chars().next_back() {
+        s.pop();
+    }
+
+    s
 }
 
 fn main() -> Result<()> {
@@ -93,16 +158,34 @@ fn main() -> Result<()> {
         }
     }
 
-    if args.normal_str.len() != 2 {
-        eprintln!("Käyttö: metsaval <KIINTEISTOTUNNUS> <MUNICIPALITY_NAME>");
+    if args.normal_str.len() != 1 {
+        eprintln!("Käyttö: metsaval <KIINTEISTOTUNNUS>");
         std::process::exit(2);
     }
 
     let property_id = &args.normal_str[0];
-    let municipality_name = &args.normal_str[1];
     let mml_api_key = config.api_key;
 
+    let mut municipalities = load_municipalities();
+    let mut municip_id = property_id.clone();
+    let Some(pos) = municip_id.find('-') else {
+        return Err(eyre!("Virheellinen kiinteistötunnus"));
+    };
+
+    municip_id.truncate(pos);
+    let municipality_name = match municipalities.get(&municip_id) {
+        Some(name) => name,
+        None => {
+            // Kysy kunta käyttäjältä ja lisää se tallennettuihin kuntiin
+            let new_municip = ask_municipality();
+            municipalities.insert(municip_id, new_municip.clone());
+            save_municipalities(municipalities);
+            &new_municip.clone()
+        }
+    };
+
     println!("Kiinteistötunnus: {property_id}");
+    println!("Kunta: {municipality_name}");
 
     let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
 
