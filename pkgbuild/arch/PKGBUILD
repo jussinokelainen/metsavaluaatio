@@ -1,6 +1,6 @@
 # Maintainer: Jussi Nokelainen <jussinoke@gmail.com>
 pkgname='metsavaluaatio'
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc='Työkalu metsän analysointiin'
 arch=('x86_64')
