@@ -143,7 +143,10 @@ fn remove_municipality(key: String) {
 }
 
 fn list_municipalities() {
-    todo!()
+    let municipalities = load_municipalities();
+    for municipality in municipalities {
+        println!("{}: {}", municipality.0, municipality.1);
+    }
 }
 
 fn main() -> Result<()> {
