@@ -26,7 +26,6 @@ struct Config {
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    let config = load_config()?;
 
     let flags = flagger::Flagset {
         flags: vec!["h", "help", "kunta-lista"],
@@ -70,6 +69,8 @@ fn main() -> Result<()> {
     }
 
     let property_id = &args.normal_str[0];
+
+    let config = load_config()?;
     let mml_api_key = config.api_key;
 
     let mut municipalities = load_municipalities();
