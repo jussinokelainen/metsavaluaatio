@@ -110,9 +110,7 @@ fn save_municipalities(municipalities: HashMap<String, String>) {
     if let Some(path) = municipality_file() {
         match serde_json::to_string_pretty(&municipalities) {
             Ok(json) => match fs::write(path, json) {
-                Ok(_) => {
-                    println!("Uusi kunta tallennettu.")
-                }
+                Ok(_) => {}
                 Err(_) => {}
             },
             Err(_) => {}
@@ -138,20 +136,30 @@ fn ask_municipality() -> String {
     s
 }
 
+fn remove_municipality(key: String) {
+    let mut municipalities = load_municipalities();
+    municipalities.remove(&key);
+    save_municipalities(municipalities);
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let config = load_config()?;
 
     let flags = flagger::Flagset {
         flags: Vec::new(),
-        value_flags: vec!["set-api-key"],
+        value_flags: vec!["aseta-api", "poista-kunta"],
         opt_flags: Vec::new(),
     };
     let args = flagger::parse_args(flags, None)?;
     for (flag, value) in args.valued_flags {
         match flag.as_str() {
-            "set-api-key" => {
+            "aseta-api" => {
                 set_api(value)?;
+                return Ok(());
+            }
+            "poista-kunta" => {
+                remove_municipality(value);
                 return Ok(());
             }
             _ => {}
