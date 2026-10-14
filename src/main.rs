@@ -24,131 +24,6 @@ struct Config {
     api_key: String,
 }
 
-fn config_file_path() -> Option<PathBuf> {
-    if let Some(home_dir) = std::env::home_dir() {
-        let config_dir = home_dir.join(".config/metsavaluaatio");
-        fs::create_dir_all(&config_dir).ok()?;
-        Some(config_dir.join("config.toml"))
-    } else {
-        None
-    }
-}
-
-/// Hakee ohjelman config.toml tiedoston
-fn load_config() -> Result<Config> {
-    if let Some(config_file) = config_file_path() {
-        let content = fs::read_to_string(config_file)?;
-        let config: Config = toml::from_str(&content)?;
-
-        Ok(config)
-    } else {
-        Err(eyre!("Kotihakemiston saaminen epäonnistui"))
-    }
-}
-
-/// Tallentaa annetun avaimen ohjelman config.toml tiedostoon
-fn set_api(key: String) -> Result<()> {
-    if let Some(config_file) = config_file_path() {
-        let api_string = format!("api_key = \"{key}\"");
-        fs::write(&config_file, api_string)?;
-        println!(
-            "API avain onnistuneesti tallennettu tiedostoon {}",
-            config_file.display()
-        );
-    } else {
-        println!("API avaimen tallentaminen epäonnistui (hakemiston luominen epäonnistui)");
-    }
-    Ok(())
-}
-
-/// Generoi ohjelman tuottamille tiedostoille nimen
-fn generate_filename(property_id: &String, suffix: &str) -> String {
-    let mut time = Local::now().trunc_subsecs(0).to_rfc3339().replace(":", "-");
-
-    // Poistaa ajasta kellonajan ja aikavyöhykkeen (esim 'T08-00-00 +0300')
-    if let Some(pos) = time.find('T') {
-        time.truncate(pos);
-    }
-
-    let mut filename = property_id.clone();
-    filename.push_str("__");
-    filename.push_str(&time);
-    filename.push_str(suffix);
-
-    filename
-}
-
-fn municipality_file() -> Option<PathBuf> {
-    if let Some(home_dir) = std::env::home_dir() {
-        let local_dir = home_dir.join(".local/share/metsavaluaatio");
-        fs::create_dir_all(&local_dir).ok()?;
-        Some(local_dir.join("municipalities.json"))
-    } else {
-        None
-    }
-}
-
-/// Hakee tallennetut kunnat
-fn load_municipalities() -> HashMap<String, String> {
-    if let Some(path) = municipality_file() {
-        if let Some(json) = read_to_string(path).ok() {
-            if let Some(parsed_content) = serde_json::from_str(&json).ok() {
-                parsed_content
-            } else {
-                HashMap::new()
-            }
-        } else {
-            HashMap::new()
-        }
-    } else {
-        HashMap::new()
-    }
-}
-
-/// Tallentaa kunnat
-fn save_municipalities(municipalities: HashMap<String, String>) {
-    if let Some(path) = municipality_file() {
-        match serde_json::to_string_pretty(&municipalities) {
-            Ok(json) => match fs::write(path, json) {
-                Ok(_) => {}
-                Err(_) => {}
-            },
-            Err(_) => {}
-        }
-    }
-}
-
-/// Kysyy käyttäjältä kunnan, joka kyseiseen koodiin liitetään
-fn ask_municipality() -> String {
-    use std::io::{Write, stdin, stdout};
-    let mut s = String::new();
-    print!("Syötä kunta: ");
-    let _ = stdout().flush();
-    stdin().read_line(&mut s).expect("Virheellinen syöte");
-
-    if let Some('\n') = s.chars().next_back() {
-        s.pop();
-    }
-    if let Some('\r') = s.chars().next_back() {
-        s.pop();
-    }
-
-    s
-}
-
-fn remove_municipality(key: String) {
-    let mut municipalities = load_municipalities();
-    municipalities.remove(&key);
-    save_municipalities(municipalities);
-}
-
-fn list_municipalities() {
-    let municipalities = load_municipalities();
-    for municipality in municipalities {
-        println!("{}: {}", municipality.0, municipality.1);
-    }
-}
-
 fn main() -> Result<()> {
     color_eyre::install()?;
     let config = load_config()?;
@@ -334,6 +209,132 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn config_file_path() -> Option<PathBuf> {
+    if let Some(home_dir) = std::env::home_dir() {
+        let config_dir = home_dir.join(".config/metsavaluaatio");
+        fs::create_dir_all(&config_dir).ok()?;
+        Some(config_dir.join("config.toml"))
+    } else {
+        None
+    }
+}
+
+/// Hakee ohjelman config.toml tiedoston
+fn load_config() -> Result<Config> {
+    if let Some(config_file) = config_file_path() {
+        let content = fs::read_to_string(config_file)?;
+        let config: Config = toml::from_str(&content)?;
+
+        Ok(config)
+    } else {
+        Err(eyre!("Kotihakemiston saaminen epäonnistui"))
+    }
+}
+
+/// Tallentaa annetun avaimen ohjelman config.toml tiedostoon
+fn set_api(key: String) -> Result<()> {
+    if let Some(config_file) = config_file_path() {
+        let api_string = format!("api_key = \"{key}\"");
+        fs::write(&config_file, api_string)?;
+        println!(
+            "API avain onnistuneesti tallennettu tiedostoon {}",
+            config_file.display()
+        );
+    } else {
+        println!("API avaimen tallentaminen epäonnistui (hakemiston luominen epäonnistui)");
+    }
+    Ok(())
+}
+
+/// Generoi ohjelman tuottamille tiedostoille nimen
+fn generate_filename(property_id: &String, suffix: &str) -> String {
+    let mut time = Local::now().trunc_subsecs(0).to_rfc3339().replace(":", "-");
+
+    // Poistaa ajasta kellonajan ja aikavyöhykkeen (esim 'T08-00-00 +0300')
+    if let Some(pos) = time.find('T') {
+        time.truncate(pos);
+    }
+
+    let mut filename = property_id.clone();
+    filename.push_str("__");
+    filename.push_str(&time);
+    filename.push_str(suffix);
+
+    filename
+}
+
+fn municipality_file() -> Option<PathBuf> {
+    if let Some(home_dir) = std::env::home_dir() {
+        let local_dir = home_dir.join(".local/share/metsavaluaatio");
+        fs::create_dir_all(&local_dir).ok()?;
+        Some(local_dir.join("municipalities.json"))
+    } else {
+        None
+    }
+}
+
+/// Hakee tallennetut kunnat
+fn load_municipalities() -> HashMap<String, String> {
+    if let Some(path) = municipality_file() {
+        if let Some(json) = read_to_string(path).ok() {
+            if let Some(parsed_content) = serde_json::from_str(&json).ok() {
+                parsed_content
+            } else {
+                HashMap::new()
+            }
+        } else {
+            HashMap::new()
+        }
+    } else {
+        HashMap::new()
+    }
+}
+
+/// Tallentaa kunnat
+fn save_municipalities(municipalities: HashMap<String, String>) {
+    if let Some(path) = municipality_file() {
+        match serde_json::to_string_pretty(&municipalities) {
+            Ok(json) => match fs::write(path, json) {
+                Ok(_) => {}
+                Err(_) => {}
+            },
+            Err(_) => {}
+        }
+    }
+}
+
+/// Kysyy käyttäjältä kunnan, joka kyseiseen koodiin liitetään
+fn ask_municipality() -> String {
+    use std::io::{Write, stdin, stdout};
+    let mut s = String::new();
+    print!("Syötä kunta: ");
+    let _ = stdout().flush();
+    stdin().read_line(&mut s).expect("Virheellinen syöte");
+
+    if let Some('\n') = s.chars().next_back() {
+        s.pop();
+    }
+    if let Some('\r') = s.chars().next_back() {
+        s.pop();
+    }
+
+    s
+}
+
+fn remove_municipality(key: String) {
+    let mut municipalities = load_municipalities();
+    municipalities.remove(&key);
+    save_municipalities(municipalities);
+    println!("Kunta {key} poistettu");
+}
+
+fn list_municipalities() {
+    let municipalities = load_municipalities();
+    for municipality in municipalities {
+        println!("{}: {}", municipality.0, municipality.1);
+    }
+}
+
 fn print_help() {
     println!(
         "METSÄVALUAATIO
@@ -344,6 +345,9 @@ fn print_help() {
         --aseta-api    | asettaa MML api-avaimen ohjelman config.toml tiedostoon
         --poista-kunta | poistaa kunnan ja sen 3-numeroisen koodin tallennettujen kuntien
                        | listasta. Argumenttina vaatii 3-numeroisen koodin, ei kunnan nimeä
-"
+
+    Ohjelmalle annetaan argumenttina halutun kiinteistön kiinteistönumero. Jos samassa
+    kunnassa ei ole aikaisemmin haettu kiinteistön tietoja, ohjelma kysyy kunnan nimen
+    ja tallentaa sen."
     );
 }
