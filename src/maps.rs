@@ -50,6 +50,37 @@ fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Sta
     kml
 }
 
+fn add_property_outline(property: &MultiPolygon) -> String {
+    // luo uusi placemarkin alku
+    let mut kml = String::from(
+        "        <Placemark>
+            <name>Kiinteistön rajat</name>
+            <Style>
+                <PolyStyle>
+                    <color>ff000000</color>
+                    <fill>0</fill>
+                    <outline>1</outline>
+                </PolyStyle>
+            </Style>
+            <MultiGeometry>\n",
+    );
+
+    // lisää koordinaatit tiedostoon
+    for polygon in &property.0 {
+        kml.push_str("                <Polygon><outerBoundaryIs><LinearRing><coordinates>\n");
+        for coord in polygon.exterior().coords() {
+            kml.push_str(&format!("                    {},{},0\n", coord.x, coord.y));
+        }
+        kml.push_str("                </coordinates></LinearRing></outerBoundaryIs></Polygon>\n");
+    }
+    kml.push_str(
+        "            </MultiGeometry>
+        </Placemark>\n",
+    );
+
+    kml
+}
+
 /// Luo placemarkkiin lisättävän <Data> kentän annetulla nimellä ja arvolla
 fn new_data<T: std::fmt::Display>(name: &str, value: Option<T>) -> String {
     if let Some(data) = value {
@@ -141,6 +172,10 @@ pub fn write_kml(
 "#,
     );
 
+    let to_wgs84 = Proj::new_known_crs(EPSG_TM35FIN, EPSG_WGS84, None)?;
+    kml.push_str(&add_property_outline(&geo_utils::transform(
+        property, &to_wgs84,
+    )));
     for feature in &features {
         let Some(geometry) = clip_stand_geometry(feature, property) else {
             continue;
@@ -156,7 +191,6 @@ pub fn write_kml(
 
         let (_, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &[stand_id])?;
 
-        let to_wgs84 = Proj::new_known_crs(EPSG_TM35FIN, EPSG_WGS84, None)?;
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
