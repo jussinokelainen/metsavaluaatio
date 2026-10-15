@@ -56,10 +56,12 @@ fn add_property_outline(property: &MultiPolygon) -> String {
         "        <Placemark>
             <name>Kiinteistön rajat</name>
             <Style>
-                <PolyStyle>
+                <LineStyle>
                     <color>ff000000</color>
+                    <width>2</width>
+                </LineStyle>
+                <PolyStyle>
                     <fill>0</fill>
-                    <outline>1</outline>
                 </PolyStyle>
             </Style>
             <MultiGeometry>\n",
@@ -125,9 +127,9 @@ fn xml_escape(value: &str) -> String {
 fn random_color() -> &'static str {
     let colors = [
         "75b8f6", "77dd77", "87e0cf", "89cff0", "90ee90", "98ff98", "99c5c4", "9adedb", "a2bffe",
-        "ace1af", "add8e6", "b2fba5", "b39eb5", "bdb0d0", "bee7a5", "cb99c9", "cef0cc", "d8a1c4",
-        "d9bbc8", "dcd0ff", "ddf3c2", "dea5a4", "f08080", "f3e5ab", "f49ac2", "f4c2c2", "f7cac1",
-        "ff6961", "ff91a4", "ff964f", "ffb6c1", "ffbcd9", "ffddf4", "ffe4e1", "fffaa0", "fffacd",
+        "add8e6", "b2fba5", "b39eb5", "bdb0d0", "cb99c9", "cef0cc", "d8a1c4", "d9bbc8", "dcd0ff",
+        "dea5a4", "f08080", "f3e5ab", "f49ac2", "f4c2c2", "f7cac1", "ff6961", "ff91a4", "ff964f",
+        "ffb6c1", "ffbcd9", "ffddf4", "ffe4e1", "fffaa0", "fffacd",
     ];
     let mut rng = rand::rng();
     let idx = rng.random_range(0..colors.len());
