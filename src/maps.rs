@@ -1,4 +1,4 @@
-use crate::consts::Cutting;
+use crate::consts::{CYAN, Cutting, RESET, YELLOW};
 use crate::model::StandSummary;
 use crate::{EPSG_TM35FIN, EPSG_WGS84, Stand, geo_utils, metsakeskus};
 use color_eyre::Result;
@@ -206,7 +206,15 @@ pub fn write_kml(
     );
 
     std::fs::write(&file_path, kml)?;
-    println!("Google maps taso: {file_path}");
+    match std::fs::canonicalize(file_path) {
+        Ok(path) => {
+            println!(
+                "Google maps taso tallennettu: {CYAN}{}{RESET}",
+                path.display()
+            );
+        }
+        Err(_) => println!("Google maps taso tallennettu: {CYAN}{file_path}{RESET}"),
+    }
     Ok(())
 }
 
@@ -222,7 +230,7 @@ pub fn open_browser(url: &str) {
         Ok(_) => {}
         Err(_) => {
             println!("Selaimen avaaminen epäonnistui, maps sivun linkki:");
-            println!("{url}\n");
+            println!("{YELLOW}{url}{RESET}\n");
         }
     }
 }

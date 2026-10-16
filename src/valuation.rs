@@ -1,3 +1,4 @@
+use crate::consts::{CYAN, GREEN, RESET};
 use crate::consts::{Cutting, PRICES, Species, TimberType};
 use crate::model::{
     RawRow, SpeciesSummary, Stand, StandSummary, StandValue, TimberValue, Totals, TreeStratum,
@@ -452,9 +453,9 @@ fn grouped(value: f64) -> String {
 /// Tulostaa koko aineiston yhteenvedon.
 pub fn print_dataset_summary(stands: &[Stand], species_summary: &[SpeciesSummary]) {
     println!("\n");
-    println!("----------");
-    println!("Yhteenveto");
-    println!("----------");
+    println!("{CYAN}----------{RESET}");
+    println!("{CYAN}Yhteenveto{RESET}");
+    println!("{CYAN}----------{RESET}");
 
     let area: f64 = sum(stands.iter().filter_map(|stand| stand.area));
     let volume: f64 = sum(species_summary.iter().map(|row| row.volume));
@@ -463,10 +464,13 @@ pub fn print_dataset_summary(stands: &[Stand], species_summary: &[SpeciesSummary
     let value: f64 = sum(species_summary.iter().map(|row| row.value_eur));
 
     println!(
-        "Kuvioiden yhteenlaskettu pinta-ala: {} ha",
+        "Kuvioiden yhteenlaskettu pinta-ala: {CYAN}{} ha{RESET}",
         grouped_precise(area, 2)
     );
-    println!("Puuston kokonaismäärä: {} m³", grouped_precise(volume, 2));
+    println!(
+        "Puuston kokonaismäärä: {CYAN}{} m³{RESET}",
+        grouped_precise(volume, 2)
+    );
     println!(
         "Metsäkeskuksen tukkimäärä: {} m³",
         grouped_precise(sawlog, 2)
@@ -475,7 +479,7 @@ pub fn print_dataset_summary(stands: &[Stand], species_summary: &[SpeciesSummary
         "Metsäkeskuksen kuitupuumäärä: {} m³",
         grouped_precise(pulpwood, 2)
     );
-    println!("LASKENNALLINEN ARVO: {} €\n", grouped(value));
+    println!("LASKENNALLINEN ARVO: {GREEN}{} €{RESET}\n", grouped(value));
 }
 
 fn grouped_precise(value: f64, decimals: usize) -> String {

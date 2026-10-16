@@ -1,4 +1,4 @@
-use crate::consts::MUNICIPALITY_ZIP_BASE;
+use crate::consts::{GREEN, MUNICIPALITY_ZIP_BASE, RESET};
 use crate::http;
 use crate::model::{StandSummary, TreeStratum};
 use color_eyre::Result;
@@ -47,7 +47,7 @@ pub fn download_gpkg(municipality_name: &str) -> Result<PathBuf> {
     let mut output = fs::File::create(&gpkg_path)?;
     std::io::copy(&mut entry, &mut output)?;
 
-    println!("GeoPackage valmis: {}", gpkg_path.display());
+    println!("{GREEN}GeoPackage valmis{RESET}: {}", gpkg_path.display());
 
     Ok(gpkg_path)
 }

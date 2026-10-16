@@ -10,6 +10,7 @@ mod model;
 mod valuation;
 mod wfs;
 
+use crate::consts::{CYAN, GREEN, RED, RESET, YELLOW};
 use crate::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
 use crate::model::Stand;
 use chrono::{Local, SubsecRound};
@@ -91,8 +92,8 @@ fn main() -> Result<()> {
         }
     };
 
-    println!("Kiinteistötunnus: {property_id}");
-    println!("Kunta: {municipality_name}");
+    println!("Kiinteistötunnus: {CYAN}{property_id}{RESET}");
+    println!("Kunta: {CYAN}{municipality_name}{RESET}");
 
     let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
 
@@ -126,7 +127,7 @@ fn main() -> Result<()> {
         geo_utils::geometry_type(&property_geometry)
     );
     println!(
-        "Pinta-ala: {:.3} ha",
+        "Pinta-ala: {CYAN}{:.3} ha{RESET}",
         geo_utils::area_m2(&property_geometry) / 10_000.0
     );
 
@@ -200,8 +201,11 @@ fn main() -> Result<()> {
         &raw_rows,
     )?;
 
-    let absolute = std::fs::canonicalize(excel_file)?;
-    println!("Excel-yhteenveto tallennettu: {}", absolute.display());
+    let absolute_xlsx = std::fs::canonicalize(excel_file)?;
+    println!(
+        "Excel-yhteenveto tallennettu: {CYAN}{}{RESET}",
+        absolute_xlsx.display()
+    );
 
     // Avaa selain kartan luonti sivulla
     let maps_url = "https://www.google.com/mymaps";
@@ -238,11 +242,13 @@ fn set_api(key: String) -> Result<()> {
         let api_string = format!("api_key = \"{key}\"");
         fs::write(&config_file, api_string)?;
         println!(
-            "API avain onnistuneesti tallennettu tiedostoon {}",
+            "{GREEN}API avain onnistuneesti tallennettu{RESET} tiedostoon {}",
             config_file.display()
         );
     } else {
-        println!("API avaimen tallentaminen epäonnistui (hakemiston luominen epäonnistui)");
+        println!(
+            "{RED}API avaimen tallentaminen epäonnistui{RESET} (hakemiston luominen epäonnistui)"
+        );
     }
     Ok(())
 }
@@ -326,7 +332,7 @@ fn remove_municipality(key: String) {
     let mut municipalities = load_municipalities();
     municipalities.remove(&key);
     save_municipalities(municipalities);
-    println!("Kunta {key} poistettu");
+    println!("Kunta {YELLOW}{key}{RESET} poistettu");
 }
 
 fn list_municipalities() {
