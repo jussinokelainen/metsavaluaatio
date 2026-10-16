@@ -178,3 +178,53 @@ pub const PRICES: PriceList = PriceList {
         },
     },
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn species_from_code_maps_known_codes() {
+        assert_eq!(Species::from_code(1), Some(Species::Manty));
+        assert_eq!(Species::from_code(2), Some(Species::Kuusi));
+        assert_eq!(Species::from_code(29), Some(Species::Koivu));
+    }
+
+    #[test]
+    fn species_from_code_rejects_unknown_codes() {
+        assert_eq!(Species::from_code(0), None);
+        assert_eq!(Species::from_code(99), None);
+    }
+
+    #[test]
+    fn cutting_from_code_maps_known_codes() {
+        assert_eq!(Cutting::from_code(2), Some(Cutting::Ensiharvennus));
+        assert_eq!(Cutting::from_code(3), Some(Cutting::Harvennus));
+        assert_eq!(Cutting::from_code(5), Some(Cutting::Uudistus));
+    }
+
+    #[test]
+    fn cutting_from_code_rejects_unknown_codes() {
+        assert_eq!(Cutting::from_code(1), None);
+        assert_eq!(Cutting::from_code(4), None);
+        assert_eq!(Cutting::from_code(67), None);
+    }
+
+    #[test]
+    fn price_lookup_returns_the_configured_value() {
+        let price = PRICES.get(Species::Kuusi, TimberType::Tukki, Cutting::Uudistus);
+        assert_eq!(price, 85.01);
+    }
+
+    #[test]
+    fn names_are_human_readable() {
+        assert_eq!(Species::Manty.name(), "Mänty");
+        assert_eq!(Species::Kuusi.name(), "Kuusi");
+        assert_eq!(Species::Koivu.name(), "Koivu");
+        assert_eq!(TimberType::Kuitu.name(), "kuitu");
+        assert_eq!(TimberType::Tukki.name(), "tukki");
+        assert_eq!(Cutting::Uudistus.name(), "uudistus");
+        assert_eq!(Cutting::Ensiharvennus.name(), "ensiharvennus");
+        assert_eq!(Cutting::Harvennus.name(), "harvennus");
+    }
+}

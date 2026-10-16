@@ -162,3 +162,15 @@ pub fn read_trees(
 
     Ok((strata, summaries))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn placeholders_are_comma_separated_question_marks() {
+        assert_eq!(placeholders(0), "");
+        assert_eq!(placeholders(1), "?");
+        assert_eq!(placeholders(3), "?,?,?");
+    }
+}

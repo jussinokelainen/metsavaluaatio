@@ -50,3 +50,27 @@ pub fn get_property_features(property_id: &str, api_key: &str) -> Result<Vec<Fea
 
     Ok(result)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_strips_separators() {
+        let normalized = normalize_property_id("740-555-0002-0000").unwrap();
+        assert_eq!(normalized, "74055500020000");
+    }
+
+    #[test]
+    fn normalize_trims_surrounding_whitespace() {
+        let normalized = normalize_property_id("  740-555-0002-0000  ").unwrap();
+        assert_eq!(normalized, "74055500020000");
+    }
+
+    #[test]
+    fn normalize_rejects_wrong_digit_count() {
+        assert!(normalize_property_id("123").is_err());
+        assert!(normalize_property_id("740-555-0002-00001").is_err());
+        assert!(normalize_property_id("").is_err());
+    }
+}

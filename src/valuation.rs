@@ -509,3 +509,135 @@ fn grouped_precise(value: f64, decimals: usize) -> String {
         None => format!("{sign}{grouped}"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Neutraali rivi jonka arvoja voidaan muuttaa testi kerrallaan
+    fn row() -> SpeciesSummary {
+        SpeciesSummary {
+            standid: 1,
+            standnumber: Some(1),
+            species: Species::Manty,
+            cutting: None,
+            cuttingproposalyear: None,
+            age: None,
+            stemcount: 0.0,
+            meandiameter: None,
+            meanheight: None,
+            area: Some(1.0),
+            volume: 0.0,
+            sawlogvolume: 0.0,
+            pulpwoodvolume: 0.0,
+            volumegrowth: 0.0,
+            growth_pct: None,
+            value_eur: 0.0,
+        }
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn ensiharvennus_is_always_worthless() {
+        let summary = SpeciesSummary {
+            cutting: Some(Cutting::Ensiharvennus),
+            volume: 100.0,
+            sawlogvolume: 50.0,
+            pulpwoodvolume: 50.0,
+            ..row()
+        };
+        assert_eq!(calculate_value(&summary), 0.0);
+    }
+
+    #[test]
+    fn harvennus_uses_the_kuitu_and_tukki_prices() {
+        // 1.0 ha * 30 m³ * 0.25 * 21.89 € + 1.0 ha * 10 m³ * 0.15 * 68.83 €
+        let summary = SpeciesSummary {
+            species: Species::Manty,
+            cutting: Some(Cutting::Harvennus),
+            area: Some(1.0),
+            volume: 30.0,
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&summary), 267.42);
+    }
+
+    #[test]
+    fn uudistus_shifts_ten_percent_of_volume_from_sawlog_to_pulpwood() {
+        let summary = SpeciesSummary {
+            species: Species::Manty,
+            cutting: Some(Cutting::Uudistus),
+            area: Some(2.0),
+            volume: 15.0,
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 5.0,
+            ..row()
+        };
+        assert_close(calculate_value(&summary), 1456.495);
+    }
+
+    #[test]
+    fn old_kuusi_without_a_cutting_proposal_is_treated_as_uudistus_at_sixty_percent() {
+        // ikä 80 >= 70 on uudistus mutta tilavuus on 0.6x
+        let summary = SpeciesSummary {
+            species: Species::Kuusi,
+            age: Some(80.0),
+            volume: 30.0,
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&summary), 631.173);
+    }
+
+    #[test]
+    fn mid_life_kuusi_without_a_cutting_proposal_is_treated_as_harvennus() {
+        // ikä 50 >= 45 (mutta < 70) on harvennus
+        let summary = SpeciesSummary {
+            species: Species::Kuusi,
+            age: Some(50.0),
+            volume: 30.0,
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&summary), 270.72);
+    }
+
+    #[test]
+    fn young_small_trees_have_no_value() {
+        let summary = SpeciesSummary {
+            species: Species::Kuusi,
+            age: Some(20.0),
+            meandiameter: Some(10.0),
+            meanheight: Some(10.0),
+            volume: 30.0,
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_eq!(calculate_value(&summary), 0.0);
+    }
+
+    #[test]
+    fn grouped_inserts_spaces_as_thousand_separators() {
+        assert_eq!(grouped(999.0), "999");
+        assert_eq!(grouped(1000.0), "1 000");
+        assert_eq!(grouped(1234567.0), "1 234 567");
+        assert_eq!(grouped(-1000.0), "-1 000");
+    }
+
+    #[test]
+    fn grouped_precise_uses_a_comma_for_decimals() {
+        assert_eq!(grouped_precise(1234.5, 2), "1 234,50");
+        assert_eq!(grouped_precise(1000.0, 2), "1 000,00");
+    }
+}

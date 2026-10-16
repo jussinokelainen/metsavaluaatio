@@ -121,3 +121,114 @@ pub fn geometry_type(polygon: &MultiPolygon<f64>) -> &'static str {
         "Polygon"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use geo::{LineString, Polygon};
+    use serde_json::json;
+
+    fn square_polygon(min: f64, size: f64) -> Polygon<f64> {
+        let max = min + size;
+        Polygon::new(
+            LineString::from(vec![
+                (min, min),
+                (max, min),
+                (max, max),
+                (min, max),
+                (min, min),
+            ]),
+            vec![],
+        )
+    }
+
+    fn square(min: f64, size: f64) -> MultiPolygon<f64> {
+        MultiPolygon::new(vec![square_polygon(min, size)])
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn value_i64_accepts_numbers_and_numeric_strings() {
+        assert_eq!(value_i64(&json!(42)), Some(42));
+        assert_eq!(value_i64(&json!(42.0)), Some(42));
+        assert_eq!(value_i64(&json!("42")), Some(42));
+        assert_eq!(value_i64(&json!(" 42 ")), Some(42));
+    }
+
+    #[test]
+    fn value_i64_rejects_non_numeric_values() {
+        assert_eq!(value_i64(&json!("abc")), None);
+        assert_eq!(value_i64(&json!(null)), None);
+        assert_eq!(value_i64(&json!(true)), None);
+    }
+
+    #[test]
+    fn value_f64_accepts_numbers_and_numeric_strings() {
+        assert_eq!(value_f64(&json!(1.5)), Some(1.5));
+        assert_eq!(value_f64(&json!("2.5")), Some(2.5));
+        assert_eq!(value_f64(&json!(" 2.5 ")), Some(2.5));
+        assert_eq!(value_f64(&json!(true)), None);
+    }
+
+    #[test]
+    fn bounds_wrap_the_whole_polygon() {
+        assert_eq!(bounds(&square(0.0, 10.0)), Some((0.0, 0.0, 10.0, 10.0)));
+    }
+
+    #[test]
+    fn area_is_measured_in_square_metres() {
+        assert_close(area_m2(&square(0.0, 10.0)), 100.0);
+    }
+
+    #[test]
+    fn geometry_type_distinguishes_single_and_multi() {
+        assert_eq!(geometry_type(&square(0.0, 1.0)), "Polygon");
+        let multi = MultiPolygon::new(vec![square_polygon(0.0, 1.0), square_polygon(5.0, 1.0)]);
+        assert_eq!(geometry_type(&multi), "MultiPolygon");
+    }
+
+    fn clipped_feature() -> geojson::Feature {
+        let feature = json!({
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0], [0.0, 0.0]]]
+            },
+            "properties": {
+                "standid": 7,
+                "standnumber": "3",
+                "cuttingtype": 5,
+                "area": 1.5
+            }
+        });
+        serde_json::from_value(feature).unwrap()
+    }
+
+    #[test]
+    fn clip_stand_keeps_properties_and_measures_the_intersection() {
+        let stand = clip_stand(&clipped_feature(), &square(0.0, 10.0)).unwrap();
+        assert_eq!(stand.standid, Some(7));
+        assert_eq!(stand.standnumber, Some(3));
+        assert_eq!(stand.cuttingtype, Some(5));
+        assert_close(stand.intersection_area_m2, 100.0);
+    }
+
+    #[test]
+    fn clip_stand_skips_intersections_below_the_threshold() {
+        let feature = json!({
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[0.0, 0.0], [0.5, 0.0], [0.5, 0.5], [0.0, 0.5], [0.0, 0.0]]]
+            }
+        });
+        let feature = serde_json::from_value(feature).unwrap();
+        assert!(clip_stand(&feature, &square(0.0, 10.0)).is_none());
+    }
+}
