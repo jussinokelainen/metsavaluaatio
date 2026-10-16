@@ -1,6 +1,7 @@
 use crate::consts::{CYAN, Cutting, RESET, YELLOW};
-use crate::model::StandSummary;
-use crate::{EPSG_TM35FIN, EPSG_WGS84, Stand, geo_utils, metsakeskus};
+use crate::consts::{EPSG_TM35FIN, EPSG_WGS84};
+use crate::model::{Stand, StandSummary};
+use crate::{geo_utils, metsakeskus};
 use color_eyre::Result;
 use geo::{BooleanOps, MultiPolygon, Polygon};
 use geojson::Feature;

@@ -1,21 +1,10 @@
-mod consts;
-mod excel;
-mod flagger;
-mod geo_utils;
-mod http;
-mod maps;
-mod metsakeskus;
-mod mml;
-mod model;
-mod valuation;
-mod wfs;
-
-use crate::consts::{CYAN, GREEN, RED, RESET, YELLOW};
-use crate::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
-use crate::model::Stand;
 use chrono::{Local, SubsecRound};
 use color_eyre::{Result, eyre::eyre};
 use geo::HasDimensions;
+use metsaval::consts::{CYAN, GREEN, RED, RESET, YELLOW};
+use metsaval::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
+use metsaval::flagger;
+use metsaval::model::Stand;
 use proj::Proj;
 use serde::Deserialize;
 use std::{collections::HashMap, fs, fs::read_to_string, path::PathBuf};
@@ -98,7 +87,7 @@ fn main() -> Result<()> {
     let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
 
     // Kiinteistön palstat MML:stä
-    let property_features = mml::get_property_features(property_id, &mml_api_key)?;
+    let property_features = metsaval::mml::get_property_features(property_id, &mml_api_key)?;
     println!("Kiinteistöltä löytyi {} palstaa.", property_features.len());
 
     if property_features.is_empty() {
@@ -107,7 +96,7 @@ fn main() -> Result<()> {
 
     let mut geometries_wgs84 = Vec::new();
     for feature in &property_features {
-        if let Some(geometry) = geo_utils::feature_to_multipolygon(feature) {
+        if let Some(geometry) = metsaval::geo_utils::feature_to_multipolygon(feature) {
             if !geometry.is_empty() {
                 geometries_wgs84.push(geometry);
             }
@@ -119,26 +108,26 @@ fn main() -> Result<()> {
     }
 
     // Yhdistetään kaikki palstat ja muutetaan ETRS-TM35FINiin.
-    let property_wgs84 = geo_utils::union_all(&geometries_wgs84);
-    let property_geometry = geo_utils::transform(&property_wgs84, &to_tm35);
+    let property_wgs84 = metsaval::geo_utils::union_all(&geometries_wgs84);
+    let property_geometry = metsaval::geo_utils::transform(&property_wgs84, &to_tm35);
 
     println!(
         "Geometriatyyppi: {}",
-        geo_utils::geometry_type(&property_geometry)
+        metsaval::geo_utils::geometry_type(&property_geometry)
     );
     println!(
         "Pinta-ala: {CYAN}{:.3} ha{RESET}",
-        geo_utils::area_m2(&property_geometry) / 10_000.0
+        metsaval::geo_utils::area_m2(&property_geometry) / 10_000.0
     );
 
     // Metsävarakuviot Metsäkeskuksen WFS:stä
-    let stand_layers = wfs::get_layers(SMK_STAND_WFS)?;
+    let stand_layers = metsaval::wfs::get_layers(SMK_STAND_WFS)?;
     println!("Metsävarakerroksia löytyi: {}", stand_layers.len());
 
-    let stand_layer = wfs::select_stand_layer(&stand_layers)?;
+    let stand_layer = metsaval::wfs::select_stand_layer(&stand_layers)?;
     println!("Käytettävä metsävaralayer on {stand_layer}");
 
-    let (min_x, min_y, max_x, max_y) = geo_utils::bounds(&property_geometry)
+    let (min_x, min_y, max_x, max_y) = metsaval::geo_utils::bounds(&property_geometry)
         .ok_or_else(|| color_eyre::eyre::eyre!("Kiinteistön geometria on tyhjä."))?;
     let bbox = format!("{min_x},{min_y},{max_x},{max_y},EPSG:3067");
 
@@ -146,12 +135,12 @@ fn main() -> Result<()> {
     println!("{bbox}");
 
     let stand_features =
-        wfs::get_features_bbox(SMK_STAND_WFS, &stand_layer, &bbox, EPSG_TM35FIN, 10_000)?;
+        metsaval::wfs::get_features_bbox(SMK_STAND_WFS, &stand_layer, &bbox, EPSG_TM35FIN, 10_000)?;
     println!("BBOX-alueelta löytyi: {} kuviota", stand_features.len());
 
     let stands: Vec<Stand> = stand_features
         .iter()
-        .filter_map(|feature| geo_utils::clip_stand(feature, &property_geometry))
+        .filter_map(|feature| metsaval::geo_utils::clip_stand(feature, &property_geometry))
         .collect();
 
     println!(
@@ -164,7 +153,7 @@ fn main() -> Result<()> {
     }
 
     // Puustotiedot Metsäkeskuksen GeoPackagesta
-    let gpkg_path = metsakeskus::download_gpkg(municipality_name)?;
+    let gpkg_path = metsaval::metsakeskus::download_gpkg(municipality_name)?;
 
     let mut stand_ids: Vec<i64> = stands.iter().filter_map(|stand| stand.standid).collect();
     stand_ids.sort_unstable();
@@ -174,25 +163,26 @@ fn main() -> Result<()> {
         color_eyre::eyre::bail!("Kuvioilta ei löytynyt standid-tunnuksia.");
     }
 
-    let (strata, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &stand_ids)?;
+    let (strata, stand_summaries) = metsaval::metsakeskus::read_trees(&gpkg_path, &stand_ids)?;
 
     // Arvon laskenta
-    let species_summary = valuation::build_species_summary(&strata, &stands)?;
-    let timber_values = valuation::build_timber_values(&species_summary);
-    let stand_values = valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
-    let raw_rows = valuation::build_raw_rows(&strata, &stands)?;
+    let species_summary = metsaval::valuation::build_species_summary(&strata, &stands)?;
+    let timber_values = metsaval::valuation::build_timber_values(&species_summary);
+    let stand_values =
+        metsaval::valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
+    let raw_rows = metsaval::valuation::build_raw_rows(&strata, &stands)?;
 
     // Tulostus
-    valuation::print_dataset_summary(&stands, &species_summary);
+    metsaval::valuation::print_dataset_summary(&stands, &species_summary);
 
     // Maps tason luonti
     let kml_file = generate_filename(property_id, ".kml");
-    maps::write_kml(stand_features, &property_geometry, &kml_file, gpkg_path)?;
+    metsaval::maps::write_kml(stand_features, &property_geometry, &kml_file, gpkg_path)?;
 
     // Excel-yhteenveto
-    let totals = valuation::compute_totals(&stands, &species_summary);
+    let totals = metsaval::valuation::compute_totals(&stands, &species_summary);
     let excel_file = generate_filename(property_id, ".xlsx");
-    excel::export(
+    metsaval::excel::export(
         &excel_file,
         &totals,
         &stand_values,
@@ -209,7 +199,7 @@ fn main() -> Result<()> {
 
     // Avaa selain kartan luonti sivulla
     let maps_url = "https://www.google.com/mymaps";
-    maps::open_browser(maps_url);
+    metsaval::maps::open_browser(maps_url);
 
     Ok(())
 }
