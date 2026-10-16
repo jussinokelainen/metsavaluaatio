@@ -42,7 +42,7 @@ pub struct TreeStratum {
 }
 
 /// Koko kuvion puustoyhteenveto (treestandsummary-taulu).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 pub struct StandSummary {
     pub standid: i64,

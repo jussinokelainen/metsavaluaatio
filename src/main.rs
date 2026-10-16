@@ -142,7 +142,12 @@ fn main() -> Result<()> {
 
     // Maps tason luonti
     let kml_file = generate_filename(property_id, ".kml");
-    metsaval::maps::write_kml(stand_features, &property_geometry, &kml_file, gpkg_path)?;
+    metsaval::maps::write_kml(
+        stand_features,
+        &property_geometry,
+        &kml_file,
+        stand_summaries,
+    )?;
     // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
     // jos se ei onnistu
     match std::fs::canonicalize(&kml_file) {

@@ -1,13 +1,12 @@
 use crate::consts::{Cutting, RESET, YELLOW};
 use crate::consts::{EPSG_TM35FIN, EPSG_WGS84};
+use crate::geo_utils;
 use crate::model::{Stand, StandSummary};
-use crate::{geo_utils, metsakeskus};
 use color_eyre::Result;
 use geo::{BooleanOps, MultiPolygon, Polygon};
 use geojson::Feature;
 use proj::Proj;
 use rand::RngExt;
-use std::path::PathBuf;
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
 fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Stand) -> String {
@@ -166,7 +165,7 @@ pub fn write_kml(
     features: Vec<Feature>,
     property: &MultiPolygon<f64>,
     file_path: &str,
-    gpkg_path: PathBuf,
+    param_summaries: Vec<StandSummary>,
 ) -> Result<()> {
     let mut kml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -192,12 +191,15 @@ pub fn write_kml(
             continue;
         };
 
-        let (_, stand_summaries) = metsakeskus::read_trees(&gpkg_path, &[stand_id])?;
+        let Some(param_summary) = param_summaries.iter().find(|s| s.standid == stand_id) else {
+            println!("\x1b[31mTietoa ei löydetty metsäkuviolle {stand_id}\x1b[0m");
+            continue;
+        };
 
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
-            kml.push_str(&create_placemark(polygon, &stand_summaries[0], &stand));
+            kml.push_str(&create_placemark(polygon, &param_summary, &stand));
         }
     }
 
