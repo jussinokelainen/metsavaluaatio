@@ -1,4 +1,4 @@
-use crate::consts::{GREEN, MUNICIPALITY_ZIP_BASE, RESET};
+use crate::consts::MUNICIPALITY_ZIP_BASE;
 use crate::http;
 use crate::model::{StandSummary, TreeStratum};
 use color_eyre::Result;
@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 /// Hakee kunnan metsävarakuviot Metsäkeskuksesta ja purkaa GeoPackagen
 /// väliaikaistiedostoon.
 pub fn download_gpkg(municipality_name: &str) -> Result<PathBuf> {
-    println!("Haetaan GeoPackage kunnalle {municipality_name}...");
     let url = format!("{MUNICIPALITY_ZIP_BASE}{municipality_name}.zip");
     let bytes = http::get_bytes(&url, &[], 300)?;
 
@@ -46,8 +45,6 @@ pub fn download_gpkg(municipality_name: &str) -> Result<PathBuf> {
     let gpkg_path = temp_dir.join(file_name);
     let mut output = fs::File::create(&gpkg_path)?;
     std::io::copy(&mut entry, &mut output)?;
-
-    println!("{GREEN}GeoPackage valmis{RESET}: {}", gpkg_path.display());
 
     Ok(gpkg_path)
 }

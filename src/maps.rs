@@ -1,4 +1,4 @@
-use crate::consts::{CYAN, Cutting, RESET, YELLOW};
+use crate::consts::{Cutting, RESET, YELLOW};
 use crate::consts::{EPSG_TM35FIN, EPSG_WGS84};
 use crate::model::{Stand, StandSummary};
 use crate::{geo_utils, metsakeskus};
@@ -207,15 +207,6 @@ pub fn write_kml(
     );
 
     std::fs::write(&file_path, kml)?;
-    match std::fs::canonicalize(file_path) {
-        Ok(path) => {
-            println!(
-                "Google maps taso tallennettu: {CYAN}{}{RESET}",
-                path.display()
-            );
-        }
-        Err(_) => println!("Google maps taso tallennettu: {CYAN}{file_path}{RESET}"),
-    }
     Ok(())
 }
 

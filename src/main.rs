@@ -1,6 +1,6 @@
 use chrono::{Local, SubsecRound};
 use color_eyre::{Result, eyre::eyre};
-use geo::HasDimensions;
+use geo::{HasDimensions, MultiPolygon};
 use metsaval::consts::{CYAN, GREEN, RED, RESET, YELLOW};
 use metsaval::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
 use metsaval::flagger;
@@ -59,57 +59,15 @@ fn main() -> Result<()> {
     }
 
     let property_id = &args.normal_str[0];
-
     let config = load_config()?;
-    let mml_api_key = config.api_key;
-
-    let mut municipalities = load_municipalities();
-    let mut municip_id = property_id.clone();
-    let Some(pos) = municip_id.find('-') else {
-        return Err(eyre!("Virheellinen kiinteistötunnus"));
-    };
-
-    municip_id.truncate(pos);
-    let municipality_name = match municipalities.get(&municip_id) {
-        Some(name) => name,
-        None => {
-            // Kysy kunta käyttäjältä ja lisää se tallennettuihin kuntiin
-            let new_municip = ask_municipality();
-            municipalities.insert(municip_id, new_municip.clone());
-            save_municipalities(municipalities);
-            &new_municip.clone()
-        }
-    };
+    let municipality_name = &parse_municipality(property_id)?;
 
     println!("Kiinteistötunnus: {CYAN}{property_id}{RESET}");
     println!("Kunta: {CYAN}{municipality_name}{RESET}");
 
-    let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
-
-    // Kiinteistön palstat MML:stä
-    let property_features = metsaval::mml::get_property_features(property_id, &mml_api_key)?;
-    println!("Kiinteistöltä löytyi {} palstaa.", property_features.len());
-
-    if property_features.is_empty() {
-        color_eyre::eyre::bail!("Kiinteistölle {property_id} ei löytynyt palstoja MML:stä.");
-    }
-
-    let mut geometries_wgs84 = Vec::new();
-    for feature in &property_features {
-        if let Some(geometry) = metsaval::geo_utils::feature_to_multipolygon(feature) {
-            if !geometry.is_empty() {
-                geometries_wgs84.push(geometry);
-            }
-        }
-    }
-
-    if geometries_wgs84.is_empty() {
-        color_eyre::eyre::bail!("MML palautti palstat, mutta niillä ei ollut geometriaa.");
-    }
-
-    // Yhdistetään kaikki palstat ja muutetaan ETRS-TM35FINiin.
-    let property_wgs84 = metsaval::geo_utils::union_all(&geometries_wgs84);
-    let property_geometry = metsaval::geo_utils::transform(&property_wgs84, &to_tm35);
+    let (property_geometry, prop_feature_count) =
+        get_property_geometry(property_id, config.api_key)?;
+    println!("Kiinteistöltä löytyi {prop_feature_count} palstaa.");
 
     println!(
         "Geometriatyyppi: {}",
@@ -153,7 +111,14 @@ fn main() -> Result<()> {
     }
 
     // Puustotiedot Metsäkeskuksen GeoPackagesta
+    let gpkg_start_t = Local::now().timestamp_millis();
+    println!("Haetaan GeoPackage kunnalle {municipality_name}...");
     let gpkg_path = metsaval::metsakeskus::download_gpkg(municipality_name)?;
+    let gpkg_total_t = (Local::now().timestamp_millis() - gpkg_start_t) as f64 / 1000.0;
+    println!(
+        "{GREEN}GeoPackage valmis{RESET} ({gpkg_total_t:.1} s): {}",
+        gpkg_path.display()
+    );
 
     let mut stand_ids: Vec<i64> = stands.iter().filter_map(|stand| stand.standid).collect();
     stand_ids.sort_unstable();
@@ -178,6 +143,17 @@ fn main() -> Result<()> {
     // Maps tason luonti
     let kml_file = generate_filename(property_id, ".kml");
     metsaval::maps::write_kml(stand_features, &property_geometry, &kml_file, gpkg_path)?;
+    // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
+    // jos se ei onnistu
+    match std::fs::canonicalize(&kml_file) {
+        Ok(path) => {
+            println!(
+                "Google maps taso tallennettu: {CYAN}{}{RESET}",
+                path.display()
+            );
+        }
+        Err(_) => println!("Google maps taso tallennettu: {CYAN}{kml_file}{RESET}"),
+    }
 
     // Excel-yhteenveto
     let totals = metsaval::valuation::compute_totals(&stands, &species_summary);
@@ -191,17 +167,54 @@ fn main() -> Result<()> {
         &raw_rows,
     )?;
 
-    let absolute_xlsx = std::fs::canonicalize(excel_file)?;
-    println!(
-        "Excel-yhteenveto tallennettu: {CYAN}{}{RESET}",
-        absolute_xlsx.display()
-    );
+    // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
+    // jos se ei onnistu
+    match std::fs::canonicalize(&excel_file) {
+        Ok(path) => {
+            println!(
+                "Excel-yhteenveto tallennettu: {CYAN}{}{RESET}",
+                path.display()
+            );
+        }
+        Err(_) => println!("Excel-yhteenveto tallennettu: {CYAN}{excel_file}{RESET}"),
+    }
 
     // Avaa selain kartan luonti sivulla
     let maps_url = "https://www.google.com/mymaps";
     metsaval::maps::open_browser(maps_url);
 
     Ok(())
+}
+
+/// Palauttaa kiinteistön geometrian yhdistettynä yhteen MultiPolygoniin, ja kiinteistöllä sijaitsevien
+/// palstojen määrän
+fn get_property_geometry(property_id: &String, api_key: String) -> Result<(MultiPolygon, usize)> {
+    // Kiinteistön palstat MML:stä
+    let property_features = metsaval::mml::get_property_features(property_id, &api_key)?;
+
+    if property_features.is_empty() {
+        color_eyre::eyre::bail!("Kiinteistölle {property_id} ei löytynyt palstoja MML:stä.");
+    }
+
+    let mut geometries_wgs84 = Vec::new();
+    for feature in &property_features {
+        if let Some(geometry) = metsaval::geo_utils::feature_to_multipolygon(feature) {
+            if !geometry.is_empty() {
+                geometries_wgs84.push(geometry);
+            }
+        }
+    }
+
+    if geometries_wgs84.is_empty() {
+        color_eyre::eyre::bail!("MML palautti palstat, mutta niillä ei ollut geometriaa.");
+    }
+
+    // Yhdistetään kaikki palstat ja muutetaan ETRS-TM35FINiin.
+    let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None)?;
+    let property_wgs84 = metsaval::geo_utils::union_all(&geometries_wgs84);
+    let property_geometry = metsaval::geo_utils::transform(&property_wgs84, &to_tm35);
+
+    Ok((property_geometry, property_features.len()))
 }
 
 fn config_file_path() -> Option<PathBuf> {
@@ -258,6 +271,27 @@ fn generate_filename(property_id: &String, suffix: &str) -> String {
     filename.push_str(suffix);
 
     filename
+}
+
+fn parse_municipality(property_id: &String) -> Result<String> {
+    let mut municipalities = load_municipalities();
+    let mut municip_id = property_id.clone();
+    let Some(pos) = municip_id.find('-') else {
+        return Err(eyre!("Virheellinen kiinteistötunnus"));
+    };
+
+    municip_id.truncate(pos);
+    let municipality_name = match municipalities.get(&municip_id) {
+        Some(name) => name,
+        None => {
+            // Kysy kunta käyttäjältä ja lisää se tallennettuihin kuntiin
+            let new_municip = ask_municipality();
+            municipalities.insert(municip_id, new_municip.clone());
+            save_municipalities(municipalities);
+            &new_municip.clone()
+        }
+    };
+    Ok(municipality_name.clone())
 }
 
 fn municipality_file() -> Option<PathBuf> {
