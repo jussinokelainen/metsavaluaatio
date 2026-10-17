@@ -19,7 +19,7 @@ fn main() -> Result<()> {
 
     let flags = flagger::Flagset {
         flags: vec!["h", "help", "kunta-lista"],
-        value_flags: vec!["aseta-api", "poista-kunta"],
+        value_flags: vec!["aseta-api", "poista-kunta", "gpkg-kohde", "gpkg-tiedosto"],
         opt_flags: Vec::new(),
     };
     let args = flagger::parse_args(flags, None)?;
@@ -36,6 +36,9 @@ fn main() -> Result<()> {
             _ => {}
         }
     }
+
+    let mut gpkg_download_dir = PathBuf::new();
+    let mut gpkg_path = PathBuf::new();
     for (flag, value) in args.valued_flags {
         match flag.as_str() {
             "aseta-api" => {
@@ -45,6 +48,14 @@ fn main() -> Result<()> {
             "poista-kunta" => {
                 remove_municipality(value);
                 return Ok(());
+            }
+            "gpkg-kohde" => {
+                gpkg_download_dir = PathBuf::from(&value);
+                println!("{YELLOW}GeoPackage ladataan hakemistoon {CYAN}{value}{RESET}");
+            }
+            "gpkg-tiedosto" => {
+                gpkg_path = PathBuf::from(&value);
+                println!("{YELLOW}GeoPackage haetaan tiedostosta {CYAN}{value}{RESET}");
             }
             _ => {}
         }
@@ -111,14 +122,20 @@ fn main() -> Result<()> {
     }
 
     // Puustotiedot Metsäkeskuksen GeoPackagesta
-    let gpkg_start_t = Local::now().timestamp_millis();
-    println!("Haetaan GeoPackage kunnalle {municipality_name}...");
-    let gpkg_path = metsaval::metsakeskus::download_gpkg(municipality_name)?;
-    let gpkg_total_t = (Local::now().timestamp_millis() - gpkg_start_t) as f64 / 1000.0;
-    println!(
-        "{GREEN}GeoPackage valmis{RESET} ({gpkg_total_t:.1} s): {}",
-        gpkg_path.display()
-    );
+    if gpkg_path.is_empty() {
+        let gpkg_start_t = Local::now().timestamp_millis();
+        println!("Haetaan GeoPackage kunnalle {municipality_name}...");
+        if gpkg_download_dir.is_empty() {
+            gpkg_download_dir =
+                std::env::temp_dir().join(format!("metsavaluaatio_{}", std::process::id()));
+        }
+        gpkg_path = metsaval::metsakeskus::download_gpkg(municipality_name, gpkg_download_dir)?;
+        let gpkg_total_t = (Local::now().timestamp_millis() - gpkg_start_t) as f64 / 1000.0;
+        println!(
+            "{GREEN}GeoPackage valmis{RESET} ({gpkg_total_t:.1} s): {}",
+            gpkg_path.display()
+        );
+    }
 
     let mut stand_ids: Vec<i64> = stands.iter().filter_map(|stand| stand.standid).collect();
     stand_ids.sort_unstable();
@@ -376,11 +393,18 @@ fn print_help() {
         "METSÄVALUAATIO
     Käyttö: metsaval <KIINTEISTÖTUNNUS> [-h | --help] [--kunta-lista] [--aseta-api <api>] [--poista-kunta <koodi>]
 
-        --help, -h     | Näytä tämä viesti
-        --kunta-lista  | listaa kaikki tallennetut kunnat ja niiden 3-numeroiset koodit
-        --aseta-api    | asettaa MML api-avaimen ohjelman config.toml tiedostoon
-        --poista-kunta | poistaa kunnan ja sen 3-numeroisen koodin tallennettujen kuntien
-                       | listasta. Argumenttina vaatii 3-numeroisen koodin, ei kunnan nimeä
+        --help, -h      | Näytä tämä viesti
+        --kunta-lista   | listaa kaikki tallennetut kunnat ja niiden 3-numeroiset koodit
+        --aseta-api     | asettaa MML api-avaimen ohjelman config.toml tiedostoon
+        --poista-kunta  | poistaa kunnan ja sen 3-numeroisen koodin tallennettujen kuntien
+                        | listasta. Argumenttina vaatii 3-numeroisen koodin, ei kunnan nimeä
+        --gpkg-kohde    | Määrittää hakemiston johon GeoPackage ladataan, jos ei halua käyttää
+                        | vakio sijaintia (/tmp hakemistoa).
+        --gpkg-tiedosto | Määrittää tiedoston josta GeoPackage haetaan. Tämä voi olla hyödyllinen,
+                        | jos haluaa hakea tiedot useammasta kiinteistöstä samassa kunnassa, niin
+                        | ei tarvitse joka kerta ladata GeoPackagea uudestaan. Ohjelma tulostaa
+                        | aina käytetyn GeoPackagen sijainnin, sitä voi käyttää uudestaan jos
+                        | tietää kunnan olevan oikea.
 
     Ohjelmalle annetaan argumenttina halutun kiinteistön kiinteistönumero. Jos samassa
     kunnassa ei ole aikaisemmin haettu kiinteistön tietoja, ohjelma kysyy kunnan nimen

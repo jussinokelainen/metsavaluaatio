@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 /// Hakee kunnan metsävarakuviot Metsäkeskuksesta ja purkaa GeoPackagen
 /// väliaikaistiedostoon.
-pub fn download_gpkg(municipality_name: &str) -> Result<PathBuf> {
+pub fn download_gpkg(municipality_name: &str, dest_dir: PathBuf) -> Result<PathBuf> {
     let url = format!("{MUNICIPALITY_ZIP_BASE}{municipality_name}.zip");
     let bytes = http::get_bytes(&url, &[], 300)?;
 
@@ -39,10 +39,9 @@ pub fn download_gpkg(municipality_name: &str) -> Result<PathBuf> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("metsavarat.gpkg"));
 
-    let temp_dir = std::env::temp_dir().join(format!("metsavaluaatio_{}", std::process::id()));
-    fs::create_dir_all(&temp_dir)?;
+    fs::create_dir_all(&dest_dir)?;
 
-    let gpkg_path = temp_dir.join(file_name);
+    let gpkg_path = dest_dir.join(file_name);
     let mut output = fs::File::create(&gpkg_path)?;
     std::io::copy(&mut entry, &mut output)?;
 
