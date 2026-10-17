@@ -196,9 +196,9 @@ mod tests {
 
     fn cli() -> Flagset {
         Flagset {
-            flags: vec!["h", "help", "kunta-lista"],
-            value_flags: vec!["aseta-api", "poista-kunta"],
-            opt_flags: Vec::new(),
+            flags: vec!["h", "help", "foo"],
+            value_flags: vec!["bar"],
+            opt_flags: vec!["baz"],
         }
     }
 
@@ -207,45 +207,52 @@ mod tests {
     }
 
     #[test]
-    fn parses_a_bare_positional_argument() {
-        let parsed = parse_args(cli(), Some(args(&["012-345-0006-0789"]))).unwrap();
-        assert_eq!(parsed.normal_str, vec!["012-345-0006-0789"]);
+    fn only_normal_strings() {
+        let parsed = parse_args(cli(), Some(args(&["foobarbaz"]))).unwrap();
+        assert_eq!(parsed.normal_str, vec!["foobarbaz"]);
         assert!(parsed.flags.is_empty());
         assert!(parsed.valued_flags.is_empty());
     }
 
     #[test]
-    fn parses_long_and_short_boolean_flags() {
+    fn bool_flags() {
         let long = parse_args(cli(), Some(args(&["--help"]))).unwrap();
         assert_eq!(long.flags, vec!["help"]);
+        assert!(long.valued_flags.is_empty());
+        assert!(long.normal_str.is_empty());
 
         let short = parse_args(cli(), Some(args(&["-h"]))).unwrap();
         assert_eq!(short.flags, vec!["h"]);
+        assert!(short.valued_flags.is_empty());
+        assert!(short.normal_str.is_empty());
     }
 
     #[test]
-    fn parses_valued_flag_with_separate_value() {
+    fn value_flag_with_value_separated() {
         let key = "secret";
-        let parsed = parse_args(cli(), Some(args(&["--aseta-api", key]))).unwrap();
+        let parsed = parse_args(cli(), Some(args(&["--bar", key]))).unwrap();
         assert_eq!(
             parsed.valued_flags,
-            vec![("aseta-api".to_string(), key.to_string())]
+            vec![("bar".to_string(), key.to_string())]
         );
         assert!(parsed.normal_str.is_empty());
+        assert!(parsed.flags.is_empty());
     }
 
     #[test]
-    fn parses_valued_flag_with_equals_sign() {
-        let parsed = parse_args(cli(), Some(args(&["--aseta-api=secret"]))).unwrap();
+    fn value_flag_with_equal_sign() {
+        let parsed = parse_args(cli(), Some(args(&["--bar=secret"]))).unwrap();
         assert_eq!(
             parsed.valued_flags,
-            vec![("aseta-api".to_string(), "secret".to_string())]
+            vec![("bar".to_string(), "secret".to_string())]
         );
+        assert!(parsed.normal_str.is_empty());
+        assert!(parsed.flags.is_empty());
     }
 
     #[test]
-    fn valued_flag_without_a_value_is_an_error() {
-        assert!(parse_args(cli(), Some(args(&["--aseta-api"]))).is_err());
+    fn valued_flag_without_value_is_an_error() {
+        assert!(parse_args(cli(), Some(args(&["--bar"]))).is_err());
     }
 
     #[test]
@@ -255,34 +262,40 @@ mod tests {
 
     #[test]
     fn double_dash_stops_flag_parsing() {
-        let parsed = parse_args(cli(), Some(args(&["--", "--help"]))).unwrap();
+        let parsed = parse_args(cli(), Some(args(&["--", "--help", "--bar"]))).unwrap();
         assert!(parsed.flags.is_empty());
-        assert_eq!(parsed.normal_str, vec!["--help"]);
+        assert!(parsed.valued_flags.is_empty());
+        assert_eq!(parsed.normal_str, vec!["--help", "--bar"]);
     }
 
     #[test]
     fn optional_flag_takes_the_next_value_when_present() {
-        let set = Flagset {
-            flags: vec![],
-            value_flags: vec![],
-            opt_flags: vec!["depth"],
-        };
-        let parsed = parse_args(set, Some(args(&["--depth", "1"]))).unwrap();
+        let parsed = parse_args(cli(), Some(args(&["--baz", "1"]))).unwrap();
         assert_eq!(
             parsed.valued_flags,
-            vec![("depth".to_string(), "1".to_string())]
+            vec![("baz".to_string(), "1".to_string())]
         );
+        assert!(parsed.flags.is_empty());
+        assert!(parsed.normal_str.is_empty());
     }
 
     #[test]
     fn optional_flag_works_as_a_boolean_when_last() {
-        let set = Flagset {
-            flags: vec![],
-            value_flags: vec![],
-            opt_flags: vec!["depth"],
-        };
-        let parsed = parse_args(set, Some(args(&["--depth"]))).unwrap();
-        assert_eq!(parsed.flags, vec!["depth"]);
+        let parsed = parse_args(cli(), Some(args(&["--baz"]))).unwrap();
+        assert_eq!(parsed.flags, vec!["baz"]);
+        assert!(parsed.normal_str.is_empty());
+        assert!(parsed.valued_flags.is_empty());
+    }
+
+    #[test]
+    fn optional_flag_with_equal_sign() {
+        let parsed = parse_args(cli(), Some(args(&["--baz=foo"]))).unwrap();
+        assert_eq!(
+            parsed.valued_flags,
+            vec![("baz".to_string(), "foo".to_string())]
+        );
+        assert!(parsed.flags.is_empty());
+        assert!(parsed.normal_str.is_empty());
     }
 
     #[test]

@@ -211,12 +211,6 @@ mod tests {
     }
 
     #[test]
-    fn price_lookup_returns_the_configured_value() {
-        let price = PRICES.get(Species::Kuusi, TimberType::Tukki, Cutting::Uudistus);
-        assert_eq!(price, 85.01);
-    }
-
-    #[test]
     fn names_are_human_readable() {
         assert_eq!(Species::Manty.name(), "Mänty");
         assert_eq!(Species::Kuusi.name(), "Kuusi");

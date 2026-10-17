@@ -114,7 +114,14 @@ fn new_placemark_start(name: String) -> String {
 }
 
 /// Muuttaa merkkijonon xml-kelpoiseksi
-fn xml_escape(value: &str) -> String {
+///
+/// # Examples
+/// ```
+/// # use::metsaval::maps::xml_escape;
+/// let s = "& < > \" '";
+/// assert_eq!(xml_escape(s), "&amp; &lt; &gt; &quot; &apos;")
+/// ```
+pub fn xml_escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
         .replace('<', "&lt;")
