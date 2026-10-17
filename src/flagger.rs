@@ -72,16 +72,18 @@ pub fn parse_args(input: Flagset, custom_args: Option<Vec<String>>) -> Result<Ar
     }
 
     // Check if a flag takes a value as a parameter
-    let requires_value = |flag: &String, num: usize| -> bool {
+    let requires_value = |flag: &String, num: usize, had_value_with_equals: bool| -> bool {
         if input.value_flags.contains(&flag.as_str()) {
             return true;
         }
 
-        if input.opt_flags.contains(&flag.as_str())
-            && (num + 1) < input_args.len()
-            && !input_args[num + 1].starts_with('-')
-        {
-            return true;
+        if input.opt_flags.contains(&flag.as_str()) {
+            if had_value_with_equals {
+                return true;
+            }
+            if (num + 1) < input_args.len() && !input_args[num + 1].starts_with('-') {
+                return true;
+            }
         }
 
         false
@@ -89,7 +91,7 @@ pub fn parse_args(input: Flagset, custom_args: Option<Vec<String>>) -> Result<Ar
 
     // Handles a single flag, only returns an error when an invalid flag is given
     let mut handle_flag = |flag: String, value: Option<&str>, num: &mut usize| -> Result<()> {
-        if requires_value(&flag, *num) {
+        if requires_value(&flag, *num, value.is_some()) {
             match value {
                 Some(v) => {
                     // Flag requires a value, and is of type --foo=bar
