@@ -18,19 +18,28 @@ brew trust jussinokelainen/metsavaluaatio
 brew install metsavaluaatio
 ```
 
-Manuaalisesti:
+#### Cargo
+
+Ohjelman voi myös asentaa käyttäen cargoa, jolloin voi valita halutessaan
+minkä vaan commitin josta asentaa.
 
 ```bash
 git clone git@github.com:jussinokelainen/metsavaluaatio.git
 cd metsavaluaatio
-make
-sudo make install
+cargo install --path .
 ```
 
-Riippuvuudet:
+Muista lisätä `~/.cargo/bin` `$PATH` muuttujaan asentaessa cargolla esim:
+
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+```
+
+##### Riippuvuudet:
 ```bash
 rust
 cmake
+sqlite
 ```
 
 Käyttö
@@ -67,8 +76,7 @@ Klikkaa lisätyn tason yläpuolella 'Share' ja nimeä kartta -> valtuuta kaikki 
 Ohjelman poistaminen
 --------------------
 
-Package managerin avulla, tai manuaalisen asennuksen jälkeen:
+Package managerin avulla, tai cargolla (riippuen asennustavasta):
 ```bash
-sudo make uninstall
+cargo uninstall metsaval
 ```
-HUOM: vaatii saman PREFIX kuin asentaessa.
