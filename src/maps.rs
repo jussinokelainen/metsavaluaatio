@@ -11,8 +11,13 @@ use std::path::PathBuf;
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
 fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Stand) -> String {
+    let name = if let Some(id) = stand.standnumber {
+        id
+    } else {
+        summary.standid
+    };
     // luo uusi placemarkin alku
-    let mut kml = new_placemark_start(summary.standid.to_string());
+    let mut kml = new_placemark_start(name.to_string());
 
     // lisää data tiedostoon
     kml.push_str("            <ExtendedData>\n");
@@ -180,7 +185,7 @@ pub fn write_kml(
     features: Vec<Feature>,
     property: &MultiPolygon<f64>,
     file_path: &PathBuf,
-    param_summaries: Vec<StandSummary>,
+    stand_summaries: Vec<StandSummary>,
 ) -> Result<()> {
     let mut kml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -206,7 +211,7 @@ pub fn write_kml(
             continue;
         };
 
-        let Some(param_summary) = param_summaries.iter().find(|s| s.standid == stand_id) else {
+        let Some(summary) = stand_summaries.iter().find(|s| s.standid == stand_id) else {
             println!(
                 "{RED}Tietoa ei löydetty metsäkuviolle {stand_id}{RESET}, tuntematon puulaji?"
             );
@@ -216,7 +221,7 @@ pub fn write_kml(
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
-            kml.push_str(&create_placemark(polygon, &param_summary, &stand));
+            kml.push_str(&create_placemark(polygon, &summary, &stand));
         }
     }
 
