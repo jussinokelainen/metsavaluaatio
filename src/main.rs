@@ -72,7 +72,7 @@ fn main() -> Result<()> {
 
     let output_file_dir = dirs::download_dir();
 
-    let property_id = &args.normal_str[0];
+    let property_id = &pad_property_id(&args.normal_str[0])?;
     let config = load_config()?;
     let municipality_name = &parse_municipality(property_id)?;
 
@@ -226,6 +226,69 @@ fn main() -> Result<()> {
     metsaval::maps::open_browser(maps_url);
 
     Ok(())
+}
+
+/// Lisää kiinteistötunnukseen puuttuvat nollat jotta pituus on oikea
+fn pad_property_id(id: &String) -> Result<String> {
+    let parts: Vec<&str> = id.split('-').collect();
+    if parts.len() != 4 {
+        return Err(eyre!("Virheellinen kiinteistötunnus"));
+    }
+
+    let mut padded_parts = Vec::new();
+    // Ensimmäiset 2 on 3 numeroa
+    for i in 0..2 {
+        let mut value = String::from(parts[i]);
+        if value.len() > 3 {
+            return Err(eyre!("Virheellinen kiinteistötunnus"));
+        }
+        if value.len() == 3 {
+            padded_parts.push(value);
+            continue;
+        }
+        // Tässä kohtaa pituus on alle 3, pitää lisätä nollat
+        let zero_count = 3 - value.len();
+        for _ in 0..zero_count {
+            let mut tmp = String::from("0");
+            tmp.push_str(&value);
+            value = tmp;
+        }
+        padded_parts.push(value);
+    }
+
+    // Viimeiset 2 on 4 numeroa
+    for i in 2..4 {
+        let mut value = String::from(parts[i]);
+        if value.len() > 4 {
+            return Err(eyre!("Virheellinen kiinteistötunnus"));
+        }
+        if value.len() == 4 {
+            padded_parts.push(value);
+            continue;
+        }
+        // Tässä kohtaa pituus on alle 4, pitää lisätä nollat
+        let zero_count = 4 - value.len();
+        for _ in 0..zero_count {
+            let mut tmp = String::from("0");
+            tmp.push_str(&value);
+            value = tmp;
+        }
+        padded_parts.push(value);
+    }
+    if padded_parts.len() != 4 {
+        println!("{padded_parts:?}");
+        return Err(eyre!("Virhe jäsentäessä kiinteistötunnusta"));
+    }
+
+    let mut out = padded_parts[0].clone();
+    out.push_str("-");
+    out.push_str(&padded_parts[1]);
+    out.push_str("-");
+    out.push_str(&padded_parts[2]);
+    out.push_str("-");
+    out.push_str(&padded_parts[3]);
+
+    Ok(out)
 }
 
 /// Kysyy käyttäjältä halutaanko tehdä xlsx ja kml tiedostot
