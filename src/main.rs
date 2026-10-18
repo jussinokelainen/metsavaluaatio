@@ -160,6 +160,11 @@ fn main() -> Result<()> {
     // Tulostus
     metsaval::valuation::print_dataset_summary(&stands, &species_summary);
 
+    // Kysy käyttäjältä luodaanko tiedostot
+    if !ask_file_creation() {
+        return Ok(());
+    }
+
     // Maps tason luonti
     let kml_file = match &output_file_dir {
         Some(dir) => dir.join(generate_filename(property_id, ".kml")),
@@ -221,6 +226,28 @@ fn main() -> Result<()> {
     metsaval::maps::open_browser(maps_url);
 
     Ok(())
+}
+
+/// Kysyy käyttäjältä halutaanko tehdä xlsx ja kml tiedostot
+fn ask_file_creation() -> bool {
+    use std::io::{Write, stdin, stdout};
+    let mut s = String::new();
+    print!("Haluatko luoda {CYAN}xlsx{RESET} ja {CYAN}kml{RESET} tiedostot? [y/n]: ");
+    let _ = stdout().flush();
+    stdin().read_line(&mut s).expect("Virheellinen syöte");
+
+    if let Some('\n') = s.chars().next_back() {
+        s.pop();
+    }
+    if let Some('\r') = s.chars().next_back() {
+        s.pop();
+    }
+
+    match s.as_str() {
+        "y" | "Y" => true,
+        "n" | "N" => false,
+        _ => ask_file_creation(),
+    }
 }
 
 /// Palauttaa kiinteistön geometrian yhdistettynä yhteen MultiPolygoniin, ja kiinteistöllä sijaitsevien
