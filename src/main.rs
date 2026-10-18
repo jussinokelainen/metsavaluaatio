@@ -17,9 +17,10 @@ struct Config {
 
 fn main() -> Result<()> {
     color_eyre::install()?;
+    let mut open_browser = false;
 
     let flags = flagger::Flagset {
-        flags: vec!["h", "help", "kunta-lista"],
+        flags: vec!["h", "help", "kunta-lista", "selain"],
         value_flags: vec!["aseta-api", "poista-kunta", "gpkg-kohde", "gpkg-tiedosto"],
         opt_flags: Vec::new(),
     };
@@ -34,6 +35,7 @@ fn main() -> Result<()> {
                 list_municipalities();
                 return Ok(());
             }
+            "selain" => open_browser = true,
             _ => {}
         }
     }
@@ -223,7 +225,12 @@ fn main() -> Result<()> {
 
     // Avaa selain kartan luonti sivulla
     let maps_url = "https://www.google.com/mymaps";
-    metsaval::maps::open_browser(maps_url);
+    if open_browser {
+        metsaval::maps::open_browser(maps_url);
+    } else {
+        println!("\nOsoite maps tason luontiin:");
+        println!("{YELLOW}{maps_url}{RESET}\n");
+    }
 
     Ok(())
 }
@@ -510,6 +517,7 @@ fn print_help() {
                         | ei tarvitse joka kerta ladata GeoPackagea uudestaan. Ohjelma tulostaa
                         | aina käytetyn GeoPackagen sijainnin, sitä voi käyttää uudestaan jos
                         | tietää kunnan olevan oikea.
+        --selain        | Avaa selaimen automaattisesti mymaps sivulla
 
     Ohjelmalle annetaan argumenttina halutun kiinteistön kiinteistönumero. Jos samassa
     kunnassa ei ole aikaisemmin haettu kiinteistön tietoja, ohjelma kysyy kunnan nimen
