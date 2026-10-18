@@ -128,11 +128,23 @@ pub fn read_trees(
             tss.volume,
             tss.sawlogvolume,
             tss.pulpwoodvolume,
-            tss.volumegrowth
+            tss.volumegrowth,
+            species.maintreespecies
         FROM treestand ts
-        JOIN treestandsummary tss ON tss.treestandid = ts.treestandid
+        JOIN treestandsummary tss
+            ON tss.treestandid = ts.treestandid
+        LEFT JOIN (
+            SELECT
+                ts2.standid,
+                MAX(tss2.maintreespecies) AS maintreespecies
+            FROM treestand ts2
+            JOIN treestandsummary tss2
+                ON tss2.treestandid = ts2.treestandid
+            WHERE tss2.maintreespecies IS NOT NULL
+            GROUP BY ts2.standid
+        ) species ON species.standid = ts.standid
         WHERE ts.standid IN ({placeholders})
-          AND ts.type = 2"
+          AND ts.type = 2;"
     );
 
     let mut statement = connection.prepare(&summary_sql)?;
@@ -148,6 +160,7 @@ pub fn read_trees(
             sawlogvolume: row.get(7)?,
             pulpwoodvolume: row.get(8)?,
             volumegrowth: row.get(9)?,
+            maintreespecies: row.get(10)?,
         })
     })?;
 

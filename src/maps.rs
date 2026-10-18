@@ -1,5 +1,5 @@
-use crate::consts::{Cutting, RED, RESET, YELLOW};
-use crate::consts::{EPSG_TM35FIN, EPSG_WGS84};
+use crate::consts::{Cutting, EPSG_TM35FIN, EPSG_WGS84, Species};
+use crate::consts::{RED, RESET, YELLOW};
 use crate::geo_utils;
 use crate::model::{Stand, StandSummary};
 use color_eyre::Result;
@@ -27,7 +27,7 @@ fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Sta
     kml.push_str(&new_data("Keski-ikä", summary.meanage));
     kml.push_str(&new_data("Keskiläpimitta", summary.meandiameter));
     kml.push_str(&new_data("Keskipituus", summary.meanheight));
-    kml.push_str(&new_data("Tilavuus", summary.volume));
+    kml.push_str(&new_data("Tilavuus m³/ha", summary.volume));
     if let Some(vol_growth) = summary.volumegrowth
         && let Some(vol) = summary.volume
     {
@@ -43,6 +43,11 @@ fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Sta
         // prosenttiarvo on 2 desimaalin tarkkuudella
         let saw_perc = ((saw_vol / (saw_vol + pulp_vol)) * 10000.0).floor() / 100.0;
         kml.push_str(&new_data("Tukkiprosentti", Some(saw_perc)));
+    }
+    if let Some(code) = summary.maintreespecies
+        && let Some(mts) = Species::from_code(code)
+    {
+        kml.push_str(&new_data("Pääpuulaji", Some(mts.name())));
     }
     if let Some(cutting) = stand.cutting() {
         kml.push_str(&new_data("Hakkuuehdotus", Some(Cutting::name(cutting))));
@@ -186,7 +191,7 @@ pub fn write_kml(
     features: Vec<Feature>,
     property: &MultiPolygon<f64>,
     file_path: &PathBuf,
-    stand_summaries: Vec<StandSummary>,
+    stand_summaries: &Vec<StandSummary>,
 ) -> Result<()> {
     let mut kml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>

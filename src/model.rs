@@ -53,6 +53,7 @@ pub struct StandSummary {
     pub sawlogvolume: Option<f64>,
     pub pulpwoodvolume: Option<f64>,
     pub volumegrowth: Option<f64>,
+    pub maintreespecies: Option<i64>,
 }
 
 /// Puulajikohtainen yhteenveto kuviolta (species_summary).

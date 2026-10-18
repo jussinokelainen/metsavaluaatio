@@ -176,7 +176,7 @@ fn main() -> Result<()> {
         stand_features,
         &property_geometry,
         &kml_file,
-        stand_summaries,
+        &stand_summaries,
     )?;
     // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
     // jos se ei onnistu
