@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::consts::{Cutting, PRICES, Species, TimberType};
 use crate::model::{RawRow, SpeciesSummary, StandValue, TimberValue, Totals};
 use color_eyre::Result;
@@ -53,7 +55,7 @@ fn headers(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| value.to_string()).collect()
 }
 
-fn write_workbook(path: &str, sheets: &[Sheet]) -> Result<()> {
+fn write_workbook(path: &PathBuf, sheets: &[Sheet]) -> Result<()> {
     let mut workbook = Workbook::new();
     let header_format = Format::new().set_bold().set_align(FormatAlign::Center);
 
@@ -113,7 +115,7 @@ fn write_workbook(path: &str, sheets: &[Sheet]) -> Result<()> {
 
 /// Kirjoittaa koko Excel-yhteenvedon (6 välilehteä) annettuun polkuun.
 pub fn export(
-    path: &str,
+    path: &PathBuf,
     totals: &Totals,
     stand_values: &[StandValue],
     species_summary: &[SpeciesSummary],

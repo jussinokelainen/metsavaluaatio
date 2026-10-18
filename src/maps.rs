@@ -7,6 +7,7 @@ use geo::{BooleanOps, MultiPolygon, Polygon};
 use geojson::Feature;
 use proj::Proj;
 use rand::RngExt;
+use std::path::PathBuf;
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
 fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Stand) -> String {
@@ -171,7 +172,7 @@ fn clip_stand_geometry(
 pub fn write_kml(
     features: Vec<Feature>,
     property: &MultiPolygon<f64>,
-    file_path: &str,
+    file_path: &PathBuf,
     param_summaries: Vec<StandSummary>,
 ) -> Result<()> {
     let mut kml = String::from(

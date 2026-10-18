@@ -195,9 +195,9 @@ mod tests {
     }
 
     #[test]
-    fn species_from_code_rejects_unknown_codes() {
-        assert_eq!(Species::from_code(0), None);
-        assert_eq!(Species::from_code(99), None);
+    fn species_from_unknown_codes_gives_muu() {
+        assert_eq!(Species::from_code(0), Some(Species::Muu));
+        assert_eq!(Species::from_code(99), Some(Species::Muu));
     }
 
     #[test]

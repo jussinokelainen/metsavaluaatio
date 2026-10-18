@@ -1,5 +1,6 @@
 use chrono::{Local, SubsecRound};
 use color_eyre::{Result, eyre::eyre};
+use dirs;
 use geo::{HasDimensions, MultiPolygon};
 use metsaval::consts::{CYAN, GREEN, RED, RESET, YELLOW};
 use metsaval::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
@@ -68,6 +69,8 @@ fn main() -> Result<()> {
         );
         std::process::exit(2);
     }
+
+    let output_file_dir = dirs::download_dir();
 
     let property_id = &args.normal_str[0];
     let config = load_config()?;
@@ -158,7 +161,10 @@ fn main() -> Result<()> {
     metsaval::valuation::print_dataset_summary(&stands, &species_summary);
 
     // Maps tason luonti
-    let kml_file = generate_filename(property_id, ".kml");
+    let kml_file = match &output_file_dir {
+        Some(dir) => dir.join(generate_filename(property_id, ".kml")),
+        None => PathBuf::from(generate_filename(property_id, ".kml")),
+    };
     metsaval::maps::write_kml(
         stand_features,
         &property_geometry,
@@ -174,12 +180,18 @@ fn main() -> Result<()> {
                 path.display()
             );
         }
-        Err(_) => println!("Google maps taso tallennettu: {CYAN}{kml_file}{RESET}"),
+        Err(_) => println!(
+            "Google maps taso tallennettu: {CYAN}{}{RESET}",
+            kml_file.display()
+        ),
     }
 
     // Excel-yhteenveto
     let totals = metsaval::valuation::compute_totals(&stands, &species_summary);
-    let excel_file = generate_filename(property_id, ".xlsx");
+    let excel_file = match &output_file_dir {
+        Some(dir) => dir.join(generate_filename(property_id, ".xlsx")),
+        None => PathBuf::from(generate_filename(property_id, ".xlsx")),
+    };
     metsaval::excel::export(
         &excel_file,
         &totals,
@@ -198,7 +210,10 @@ fn main() -> Result<()> {
                 path.display()
             );
         }
-        Err(_) => println!("Excel-yhteenveto tallennettu: {CYAN}{excel_file}{RESET}"),
+        Err(_) => println!(
+            "Excel-yhteenveto tallennettu: {CYAN}{}{RESET}",
+            excel_file.display()
+        ),
     }
 
     // Avaa selain kartan luonti sivulla
