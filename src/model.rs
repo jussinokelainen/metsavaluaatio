@@ -8,9 +8,7 @@ pub struct Stand {
     pub cuttingtype: Option<i64>,
     pub cuttingproposalyear: Option<i64>,
     pub area: Option<f64>,
-    #[allow(dead_code)]
     pub intersection_area_m2: f64,
-    #[allow(dead_code)]
     pub intersection_area_ha: f64,
 }
 
