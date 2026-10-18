@@ -22,7 +22,14 @@ fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Sta
     kml.push_str(&new_data("Keski-ikä", summary.meanage));
     kml.push_str(&new_data("Keskiläpimitta", summary.meandiameter));
     kml.push_str(&new_data("Keskipituus", summary.meanheight));
-    kml.push_str(&new_data("Tilavuuskasvuprosentti", summary.volumegrowth));
+    if let Some(vol_growth) = summary.volumegrowth
+        && let Some(vol) = summary.volume
+    {
+        let perc = vol_growth / vol * 100.0;
+        let perc = format!("{perc:.2}");
+        kml.push_str(&new_data("Tilavuuskasvuprosentti", Some(perc)));
+    }
+
     if let Some(saw_vol) = summary.sawlogvolume
         && let Some(pulp_vol) = summary.pulpwoodvolume
     {
