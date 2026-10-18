@@ -240,6 +240,7 @@ pub fn calculate_value(row: &SpeciesSummary) -> f64 {
                 return harvennus(species, sawlog, pulpwood, volume, area);
             }
         }
+        Species::Muu => return 0.0,
     }
 
     0.0

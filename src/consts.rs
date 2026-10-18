@@ -26,6 +26,7 @@ pub enum Species {
     Manty,
     Kuusi,
     Koivu,
+    Muu,
 }
 
 impl Species {
@@ -35,7 +36,7 @@ impl Species {
             1 => Some(Self::Manty),
             2 => Some(Self::Kuusi),
             29 => Some(Self::Koivu),
-            _ => None,
+            _ => Some(Self::Muu),
         }
     }
 
@@ -44,6 +45,7 @@ impl Species {
             Self::Manty => "Mänty",
             Self::Kuusi => "Kuusi",
             Self::Koivu => "Koivu",
+            Self::Muu => "Muu",
         }
     }
 }
@@ -135,6 +137,8 @@ impl PriceList {
             Species::Manty => &self.manty,
             Species::Kuusi => &self.kuusi,
             Species::Koivu => &self.koivu,
+            // Muu puulaji, hinta 0
+            Species::Muu => return 0.0,
         };
         wood.get(timber, cutting)
     }

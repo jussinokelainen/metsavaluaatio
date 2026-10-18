@@ -1,4 +1,4 @@
-use crate::consts::{Cutting, RESET, YELLOW};
+use crate::consts::{Cutting, RED, RESET, YELLOW};
 use crate::consts::{EPSG_TM35FIN, EPSG_WGS84};
 use crate::geo_utils;
 use crate::model::{Stand, StandSummary};
@@ -199,7 +199,9 @@ pub fn write_kml(
         };
 
         let Some(param_summary) = param_summaries.iter().find(|s| s.standid == stand_id) else {
-            println!("\x1b[31mTietoa ei löydetty metsäkuviolle {stand_id}\x1b[0m");
+            println!(
+                "{RED}Tietoa ei löydetty metsäkuviolle {stand_id}{RESET}, tuntematon puulaji?"
+            );
             continue;
         };
 
