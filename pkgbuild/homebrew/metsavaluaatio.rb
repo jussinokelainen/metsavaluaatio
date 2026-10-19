@@ -1,8 +1,8 @@
 class Metsavaluaatio < Formula
   desc "Työkalu metsän tietojen analysointiin"
   homepage "https://github.com/jussinokelainen/metsavaluaatio"
-  url "https://github.com/jussinokelainen/metsavaluaatio/archive/refs/tags/0.2.0.tar.gz"
-  sha256 "e405acbdaceca92f2ebd269b6f33f274fdc79e0826764a213077e9c04cb5a9b1"
+  url "https://github.com/jussinokelainen/metsavaluaatio/archive/refs/tags/0.2.1.tar.gz"
+  sha256 "73e5ba847145a7d4f946fcbdd5d7b1016dc2842efbc9dbdf1ea800272a933b7f"
   license "AGPL-3.0-only"
 
   depends_on "rust" => :build
