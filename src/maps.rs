@@ -22,20 +22,31 @@ fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
     // lisää data tiedostoon
     kml.push_str("            <ExtendedData>\n");
 
+    kml.push_str(&new_data(
+        "Arvo",
+        Some(format!("{:.2} €", values.value_eur)),
+    ));
     kml.push_str(&new_data("Pinta-ala (ha)", values.area));
     kml.push_str(&new_data("Runkoluku kpl/ha", values.stemcount));
     kml.push_str(&new_data("Keski-ikä", values.meanage));
     kml.push_str(&new_data("Keskiläpimitta", values.meandiameter));
     kml.push_str(&new_data("Keskipituus", values.meanheight));
-    kml.push_str(&new_data("Tilavuus m³/ha", Some(values.volume)));
-    kml.push_str(&new_data("Tilavuuskasvuprosentti", values.growth_pct));
+    kml.push_str(&new_data(
+        "Tilavuus m³/ha",
+        Some(format!("{:.2}", values.volume)),
+    ));
+    kml.push_str(&new_data(
+        "Tilavuuskasvuprosentti",
+        values.growth_pct.and_then(|p| Some(format!("{:.2}", p))),
+    ));
 
-    // Kerrotaan arvo 10000:lla josta floor() ja jaetaan 100:lla jotta
-    // prosenttiarvo on 2 desimaalin tarkkuudella
-    let saw_perc =
-        ((values.sawlogvolume / (values.sawlogvolume + values.pulpwoodvolume)) * 10000.0).floor()
-            / 100.0;
-    kml.push_str(&new_data("Tukkiprosentti", Some(saw_perc)));
+    kml.push_str(&new_data(
+        "Tukkiprosentti",
+        Some(format!(
+            "{:.2}",
+            (values.sawlogvolume / (values.sawlogvolume + values.pulpwoodvolume)) * 100.0
+        )),
+    ));
     if let Some(code) = values.main_species
         && let Some(mts) = Species::from_code(code)
     {
