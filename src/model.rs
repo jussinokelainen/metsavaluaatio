@@ -54,6 +54,9 @@ pub struct StandSummary {
     pub pulpwoodvolume: Option<f64>,
     pub volumegrowth: Option<f64>,
     pub main_species: Option<i64>,
+    pub fertility_class: Option<i64>,
+    pub main_group: Option<i64>,
+    pub soil_type: Option<i64>,
 }
 
 /// Puulajikohtainen yhteenveto kuviolta (species_summary).
@@ -109,6 +112,9 @@ pub struct StandValue {
     pub area: Option<f64>,
     pub growth_pct: Option<f64>,
     pub main_species: Option<i64>,
+    pub fertility_class: Option<i64>,
+    pub main_group: Option<i64>,
+    pub soil_type: Option<i64>,
 }
 
 /// Raakarivi (df), jossa puuston perustiedot ja kuvion tiedot yhdistettynä.

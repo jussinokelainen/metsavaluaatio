@@ -57,6 +57,10 @@ fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
         kml.push_str(&new_data("Ehdotusvuosi", values.cuttingproposalyear));
     }
 
+    kml.push_str(&new_data("Kasvupaikka", values.fertility_class));
+    kml.push_str(&new_data("Maaluokka", values.main_group));
+    kml.push_str(&new_data("Maalaji", values.soil_type));
+
     kml.push_str("            </ExtendedData>\n");
 
     // lisää koordinaatit tiedostoon

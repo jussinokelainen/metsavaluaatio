@@ -129,7 +129,10 @@ pub fn read_trees(
             tss.sawlogvolume,
             tss.pulpwoodvolume,
             tss.volumegrowth,
-            species.maintreespecies
+            species.maintreespecies,
+            s.fertilityclass,
+            s.maingroup,
+            s.soiltype
         FROM treestand ts
         JOIN treestandsummary tss
             ON tss.treestandid = ts.treestandid
@@ -143,6 +146,8 @@ pub fn read_trees(
             WHERE tss2.maintreespecies IS NOT NULL
             GROUP BY ts2.standid
         ) species ON species.standid = ts.standid
+        LEFT JOIN stand s
+            ON s.standid = ts.standid
         WHERE ts.standid IN ({placeholders})
           AND ts.type = 2;"
     );
@@ -161,6 +166,9 @@ pub fn read_trees(
             pulpwoodvolume: row.get(8)?,
             volumegrowth: row.get(9)?,
             main_species: row.get(10)?,
+            fertility_class: row.get(11)?,
+            main_group: row.get(12)?,
+            soil_type: row.get(13)?,
         })
     })?;
 

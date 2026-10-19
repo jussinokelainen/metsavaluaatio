@@ -346,6 +346,9 @@ pub fn build_stand_values(
             area,
             growth_pct,
             main_species: summary.and_then(|summary| summary.main_species),
+            fertility_class: summary.and_then(|summary| summary.fertility_class),
+            main_group: summary.and_then(|summary| summary.main_group),
+            soil_type: summary.and_then(|summary| summary.soil_type),
         });
     }
 
