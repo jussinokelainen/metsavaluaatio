@@ -345,6 +345,7 @@ pub fn build_stand_values(
             meanheight: summary.and_then(|summary| summary.meanheight),
             area,
             growth_pct,
+            main_species: summary.and_then(|summary| summary.main_species),
         });
     }
 

@@ -1,7 +1,7 @@
-use crate::consts::{Cutting, EPSG_TM35FIN, EPSG_WGS84, Species};
+use crate::consts::{EPSG_TM35FIN, EPSG_WGS84, Species};
 use crate::consts::{RED, RESET, YELLOW};
 use crate::geo_utils;
-use crate::model::{Stand, StandSummary};
+use crate::model::StandValue;
 use color_eyre::Result;
 use geo::{BooleanOps, MultiPolygon, Polygon};
 use geojson::Feature;
@@ -10,11 +10,11 @@ use rand::RngExt;
 use std::path::PathBuf;
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
-fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Stand) -> String {
-    let name = if let Some(id) = stand.standnumber {
+fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
+    let name = if let Some(id) = values.standnumber {
         id
     } else {
-        summary.standid
+        values.standid
     };
     // luo uusi placemarkin alku
     let mut kml = new_placemark_start(name.to_string());
@@ -22,36 +22,28 @@ fn create_placemark(property: &Polygon<f64>, summary: &StandSummary, stand: &Sta
     // lisää data tiedostoon
     kml.push_str("            <ExtendedData>\n");
 
-    kml.push_str(&new_data("Pinta-ala (ha)", stand.area));
-    kml.push_str(&new_data("Runkoluku kpl/ha", summary.stemcount));
-    kml.push_str(&new_data("Keski-ikä", summary.meanage));
-    kml.push_str(&new_data("Keskiläpimitta", summary.meandiameter));
-    kml.push_str(&new_data("Keskipituus", summary.meanheight));
-    kml.push_str(&new_data("Tilavuus m³/ha", summary.volume));
-    if let Some(vol_growth) = summary.volumegrowth
-        && let Some(vol) = summary.volume
-    {
-        let perc = vol_growth / vol * 100.0;
-        let perc = format!("{perc:.2}");
-        kml.push_str(&new_data("Tilavuuskasvuprosentti", Some(perc)));
-    }
+    kml.push_str(&new_data("Pinta-ala (ha)", values.area));
+    kml.push_str(&new_data("Runkoluku kpl/ha", values.stemcount));
+    kml.push_str(&new_data("Keski-ikä", values.meanage));
+    kml.push_str(&new_data("Keskiläpimitta", values.meandiameter));
+    kml.push_str(&new_data("Keskipituus", values.meanheight));
+    kml.push_str(&new_data("Tilavuus m³/ha", Some(values.volume)));
+    kml.push_str(&new_data("Tilavuuskasvuprosentti", values.growth_pct));
 
-    if let Some(saw_vol) = summary.sawlogvolume
-        && let Some(pulp_vol) = summary.pulpwoodvolume
-    {
-        // Kerrotaan arvo 10000:lla josta floor() ja jaetaan 100:lla jotta
-        // prosenttiarvo on 2 desimaalin tarkkuudella
-        let saw_perc = ((saw_vol / (saw_vol + pulp_vol)) * 10000.0).floor() / 100.0;
-        kml.push_str(&new_data("Tukkiprosentti", Some(saw_perc)));
-    }
-    if let Some(code) = summary.maintreespecies
+    // Kerrotaan arvo 10000:lla josta floor() ja jaetaan 100:lla jotta
+    // prosenttiarvo on 2 desimaalin tarkkuudella
+    let saw_perc =
+        ((values.sawlogvolume / (values.sawlogvolume + values.pulpwoodvolume)) * 10000.0).floor()
+            / 100.0;
+    kml.push_str(&new_data("Tukkiprosentti", Some(saw_perc)));
+    if let Some(code) = values.main_species
         && let Some(mts) = Species::from_code(code)
     {
         kml.push_str(&new_data("Pääpuulaji", Some(mts.name())));
     }
-    if let Some(cutting) = stand.cutting() {
-        kml.push_str(&new_data("Hakkuuehdotus", Some(Cutting::name(cutting))));
-        kml.push_str(&new_data("Ehdotusvuosi", stand.cuttingproposalyear));
+    if let Some(cutting) = values.cutting {
+        kml.push_str(&new_data("Hakkuuehdotus", Some(cutting.name())));
+        kml.push_str(&new_data("Ehdotusvuosi", values.cuttingproposalyear));
     }
 
     kml.push_str("            </ExtendedData>\n");
@@ -191,7 +183,7 @@ pub fn write_kml(
     features: Vec<Feature>,
     property: &MultiPolygon<f64>,
     file_path: &PathBuf,
-    stand_summaries: &Vec<StandSummary>,
+    stand_values: &Vec<StandValue>,
 ) -> Result<()> {
     let mut kml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -217,9 +209,9 @@ pub fn write_kml(
             continue;
         };
 
-        let Some(summary) = stand_summaries.iter().find(|s| s.standid == stand_id) else {
+        let Some(values) = stand_values.iter().find(|s| s.standid == stand_id) else {
             println!(
-                "{RED}Tietoa ei löydetty metsäkuviolle {stand_id}{RESET}, tuntematon puulaji?"
+                "{RED}Tietoa ei löytynyt metsäkuviolle {stand_id}{RESET}, tuntematon puulaji?"
             );
             continue;
         };
@@ -227,7 +219,7 @@ pub fn write_kml(
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
-            kml.push_str(&create_placemark(polygon, &summary, &stand));
+            kml.push_str(&create_placemark(polygon, &values));
         }
     }
 

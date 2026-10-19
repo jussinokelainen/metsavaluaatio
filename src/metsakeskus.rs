@@ -160,7 +160,7 @@ pub fn read_trees(
             sawlogvolume: row.get(7)?,
             pulpwoodvolume: row.get(8)?,
             volumegrowth: row.get(9)?,
-            maintreespecies: row.get(10)?,
+            main_species: row.get(10)?,
         })
     })?;
 
