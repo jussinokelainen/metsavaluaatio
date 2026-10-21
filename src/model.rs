@@ -140,6 +140,9 @@ pub struct RawRow {
     pub standnumber: Option<i64>,
     pub cutting: Option<Cutting>,
     pub cuttingproposalyear: Option<i64>,
+    pub fertility_class: Option<i64>,
+    pub main_group: Option<i64>,
+    pub soil_type: Option<i64>,
 }
 
 /// Koko aineiston tunnusluvut (Yhteenveto-välilehti).

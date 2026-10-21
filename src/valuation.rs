@@ -358,7 +358,11 @@ pub fn build_stand_values(
 }
 
 /// Rakentaa raakarivit (df): puuston perustiedot + kuvion tiedot.
-pub fn build_raw_rows(strata: &[TreeStratum], stands: &[Stand]) -> Result<Vec<RawRow>> {
+pub fn build_raw_rows(
+    strata: &[TreeStratum],
+    stands: &[Stand],
+    stand_summaries: &[StandSummary],
+) -> Result<Vec<RawRow>> {
     let mut rows = Vec::new();
 
     for stratum in strata {
@@ -368,6 +372,10 @@ pub fn build_raw_rows(strata: &[TreeStratum], stands: &[Stand]) -> Result<Vec<Ra
         else {
             continue;
         };
+
+        let summary = stand_summaries
+            .iter()
+            .find(|summary| summary.standid == stratum.standid);
 
         let Some(species) = Species::from_code(stratum.treespecies) else {
             color_eyre::eyre::bail!("Tuntematon puulaji: {}", stratum.treespecies);
@@ -394,6 +402,9 @@ pub fn build_raw_rows(strata: &[TreeStratum], stands: &[Stand]) -> Result<Vec<Ra
             standnumber: stand.standnumber,
             cutting: stand.cutting(),
             cuttingproposalyear: stand.cuttingproposalyear,
+            fertility_class: summary.and_then(|s| s.fertility_class),
+            main_group: summary.and_then(|s| s.main_group),
+            soil_type: summary.and_then(|s| s.soil_type),
         });
     }
 

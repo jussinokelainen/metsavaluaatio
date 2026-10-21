@@ -304,6 +304,7 @@ fn timber_sheet(timber_values: &[TimberValue]) -> Sheet {
 
 fn raw_sheet(raw_rows: &[RawRow]) -> Sheet {
     let headers = headers(&[
+        "Kuvio",
         "Kuvio ID",
         "Puulaji ID",
         "Ikä, v",
@@ -321,15 +322,18 @@ fn raw_sheet(raw_rows: &[RawRow]) -> Sheet {
         "Oksabiomassa",
         "Lehtibiomassa",
         "Puulaji",
-        "Kuvio",
         "Hakkuuehdotus",
         "Ehdotusvuosi",
+        "Kasvupaikka",
+        "Maaluokka",
+        "Maalaji",
     ]);
 
     let rows = raw_rows
         .iter()
         .map(|row| {
             vec![
+                opt_int(row.standnumber),
                 Cell::Int(row.standid),
                 Cell::Int(row.treespecies),
                 opt_num(row.age),
@@ -347,9 +351,11 @@ fn raw_sheet(raw_rows: &[RawRow]) -> Sheet {
                 opt_num(row.branchbiomass),
                 opt_num(row.leafbiomass),
                 text(row.species.name()),
-                opt_int(row.standnumber),
                 cutting_text(row.cutting),
                 opt_int(row.cuttingproposalyear),
+                opt_int(row.fertility_class),
+                opt_int(row.main_group),
+                opt_int(row.soil_type),
             ]
         })
         .collect();

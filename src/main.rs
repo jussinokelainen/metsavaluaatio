@@ -157,7 +157,7 @@ fn main() -> Result<()> {
     let timber_values = metsaval::valuation::build_timber_values(&species_summary);
     let stand_values =
         metsaval::valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
-    let raw_rows = metsaval::valuation::build_raw_rows(&strata, &stands)?;
+    let raw_rows = metsaval::valuation::build_raw_rows(&strata, &stands, &stand_summaries)?;
 
     // Tulostus
     metsaval::valuation::print_dataset_summary(&stands, &species_summary);
