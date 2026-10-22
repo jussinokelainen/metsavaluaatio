@@ -20,61 +20,62 @@ fn main() -> Result<()> {
     let mut open_browser = false;
 
     let flags = flagger::Flagset {
-        flags: vec!["h", "help", "kunta-lista", "selain"],
-        value_flags: vec!["aseta-api", "poista-kunta", "gpkg-kohde", "gpkg-tiedosto"],
-        opt_flags: Vec::new(),
+        flags: vec!["h", "help", "kunta-lista", "selain"].into(),
+        value_flags: vec!["aseta-api", "poista-kunta", "gpkg-kohde", "gpkg-tiedosto"].into(),
+        opt_flags: None,
     };
     let args = flagger::parse_args(flags, None)?;
-    for flag in args.flags {
-        match flag.as_str() {
-            "h" | "help" => {
-                print_help();
-                return Ok(());
+    if let Some(flags) = args.flags {
+        for flag in flags {
+            match flag.as_str() {
+                "h" | "help" => {
+                    print_help();
+                    return Ok(());
+                }
+                "kunta-lista" => {
+                    list_municipalities();
+                    return Ok(());
+                }
+                "selain" => open_browser = true,
+                _ => {}
             }
-            "kunta-lista" => {
-                list_municipalities();
-                return Ok(());
-            }
-            "selain" => open_browser = true,
-            _ => {}
         }
     }
 
     let mut gpkg_download_dir = PathBuf::new();
     let mut gpkg_path = PathBuf::new();
-    for (flag, value) in args.valued_flags {
-        match flag.as_str() {
-            "aseta-api" => {
-                set_api(value)?;
-                return Ok(());
+    if let Some(value_flags) = args.value_flags {
+        for (flag, value) in value_flags {
+            match flag.as_str() {
+                "aseta-api" => {
+                    set_api(value)?;
+                    return Ok(());
+                }
+                "poista-kunta" => {
+                    remove_municipality(value);
+                    return Ok(());
+                }
+                "gpkg-kohde" => {
+                    gpkg_download_dir = PathBuf::from(&value);
+                    println!("{YELLOW}GeoPackage ladataan hakemistoon {CYAN}{value}{RESET}");
+                }
+                "gpkg-tiedosto" => {
+                    gpkg_path = PathBuf::from(&value);
+                    println!("{YELLOW}GeoPackage haetaan tiedostosta {CYAN}{value}{RESET}");
+                }
+                _ => {}
             }
-            "poista-kunta" => {
-                remove_municipality(value);
-                return Ok(());
-            }
-            "gpkg-kohde" => {
-                gpkg_download_dir = PathBuf::from(&value);
-                println!("{YELLOW}GeoPackage ladataan hakemistoon {CYAN}{value}{RESET}");
-            }
-            "gpkg-tiedosto" => {
-                gpkg_path = PathBuf::from(&value);
-                println!("{YELLOW}GeoPackage haetaan tiedostosta {CYAN}{value}{RESET}");
-            }
-            _ => {}
         }
     }
 
-    if args.normal_str.len() != 1 {
-        eprintln!(
-            "Käyttö: metsaval <KIINTEISTÖTUNNUS>
-    Lisätietoja: metsaval --help"
-        );
+    let Some([raw_property_id]) = args.normal_str.as_deref() else {
+        print_usage();
         std::process::exit(2);
-    }
+    };
 
     let output_file_dir = dirs::download_dir();
 
-    let property_id = &pad_property_id(&args.normal_str[0])?;
+    let property_id = &pad_property_id(raw_property_id)?;
     let config = load_config()?;
     let municipality_name = &parse_municipality(property_id)?;
 
@@ -493,6 +494,13 @@ fn list_municipalities() {
     for municipality in municipalities {
         println!("{}: {}", municipality.0, municipality.1);
     }
+}
+
+fn print_usage() {
+    eprintln!(
+        "Käyttö: metsaval <KIINTEISTÖTUNNUS>
+    Lisätietoja: metsaval --help"
+    );
 }
 
 fn print_help() {
