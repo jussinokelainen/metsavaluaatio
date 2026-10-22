@@ -247,6 +247,15 @@ pub fn write_kml(
     Ok(())
 }
 
+fn hyperlink<'a>(url: &'a str) -> String {
+    format!("\x1b]8;;{url}\x1b\\{url}\x1b]8;;\x1b\\")
+}
+
+pub fn print_maps_url(url: &str) {
+    println!("\nLinkki maps tason luontiin:");
+    println!("{YELLOW}{}{RESET}\n", hyperlink(url));
+}
+
 /// Avaa selaimen annetulla url:lla, tai printtaa linkin jos selaimen
 /// avaaminen ei onnistu
 pub fn open_browser(url: &str) {
@@ -258,8 +267,8 @@ pub fn open_browser(url: &str) {
     match command.arg(url).spawn() {
         Ok(_) => {}
         Err(_) => {
-            println!("Selaimen avaaminen epäonnistui, maps sivun linkki:");
-            println!("{YELLOW}{url}{RESET}\n");
+            println!("Selaimen avaaminen epäonnistui!");
+            print_maps_url(url);
         }
     }
 }

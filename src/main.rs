@@ -224,8 +224,7 @@ fn main() -> Result<()> {
     if open_browser {
         metsaval::maps::open_browser(maps_url);
     } else {
-        println!("\nOsoite maps tason luontiin:");
-        println!("{YELLOW}{maps_url}{RESET}\n");
+        metsaval::maps::print_maps_url(maps_url);
     }
 
     Ok(())
