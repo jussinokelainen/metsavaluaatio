@@ -159,9 +159,10 @@ fn main() -> Result<()> {
     let stand_values =
         metsaval::valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
     let raw_rows = metsaval::valuation::build_raw_rows(&strata, &stands, &stand_summaries)?;
+    let fixed_costs = metsaval::valuation::build_fixed_costs(&stand_values);
 
     // Tulostus
-    metsaval::valuation::print_dataset_summary(&stands, &species_summary);
+    metsaval::valuation::print_dataset_summary(&stands, &stand_values, &fixed_costs);
 
     // Kysy käyttäjältä luodaanko tiedostot
     if !ask_file_creation() {

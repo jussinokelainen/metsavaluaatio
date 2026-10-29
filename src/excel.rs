@@ -204,7 +204,7 @@ fn stand_sheet(stand_values: &[StandValue]) -> Sheet {
                 Cell::Num(row.pulpwoodvolume),
                 Cell::Num(row.volumegrowth),
                 opt_num(row.growth_pct),
-                Cell::Num(row.value_eur),
+                Cell::Num(row.income_eur),
             ]
         })
         .collect();

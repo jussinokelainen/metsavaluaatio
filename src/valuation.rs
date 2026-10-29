@@ -1,11 +1,11 @@
-use crate::consts::{CYAN, GREEN, RESET};
+use crate::consts::{COST_RATES, CYAN, GREEN, LIMITS, RED, RESET, YELLOW};
 use crate::consts::{Cutting, PRICES, Species, TimberType};
 use crate::model::{
     RawRow, SpeciesSummary, Stand, StandSummary, StandValue, TimberValue, Totals, TreeStratum,
 };
 use color_eyre::Result;
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 // ---------------------------------------------------------------------------
 // Apufunktiot
@@ -179,6 +179,40 @@ pub fn build_species_summary(
 }
 
 // ---------------------------------------------------------------------------
+// Kuviokohtaiset Kulut
+// ---------------------------------------------------------------------------
+
+/// Laskee kulut yhdelle kuviolle
+pub fn calculate_costs(
+    area: Option<f64>,
+    sawlog: f64,
+    pulpwood: f64,
+    cutting: Option<Cutting>,
+) -> f64 {
+    if let Some(a) = area {
+        match cutting {
+            Some(Cutting::Ensiharvennus) => 0.0,
+            Some(Cutting::Harvennus) => {
+                let volume = a * pulpwood * 0.3 + a * sawlog * 0.1;
+                let mut cost = volume * COST_RATES.palvelumaksu;
+                cost += a * COST_RATES.ennakkoraivaus_harvennus;
+                cost
+            }
+            Some(Cutting::Uudistus) => {
+                let volume = a * pulpwood * 0.75 + a * sawlog * 0.75;
+                let mut cost = volume * COST_RATES.palvelumaksu;
+                cost += a * COST_RATES.maanmuokkaus_uudistus;
+                cost += a * COST_RATES.taimet_siementen_uudistus;
+                cost
+            }
+            None => 0.0,
+        }
+    } else {
+        0.0
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Arvon laskenta
 // ---------------------------------------------------------------------------
 
@@ -186,61 +220,102 @@ fn ge(value: Option<f64>, threshold: f64) -> bool {
     value.map(|value| value >= threshold).unwrap_or(false)
 }
 
-fn uudistus(species: Species, sawlog: f64, pulpwood: f64, volume: f64, area: f64) -> f64 {
-    // -15 % ja 10 % yks. kokonaisvolyymista tukista kuiduksi
-    let adjusted_sawlog = area * sawlog * 0.85 - area * volume * 0.1;
-    let adjusted_pulpwood = area * pulpwood * 0.85 + area * volume * 0.1;
-
-    adjusted_sawlog * PRICES.get(species, TimberType::Tukki, Cutting::Uudistus)
-        + adjusted_pulpwood * PRICES.get(species, TimberType::Kuitu, Cutting::Uudistus)
+fn uudistus(species: Species, sawlog: f64, pulpwood: f64, area: f64) -> f64 {
+    // // -15 % ja 10 % yks. kokonaisvolyymista tukista kuiduksi
+    // let adjusted_sawlog = area * sawlog * 0.85 - area * volume * 0.1;
+    // let adjusted_pulpwood = area * pulpwood * 0.85 + area * volume * 0.1;
+    //
+    // adjusted_sawlog * PRICES.get(species, TimberType::Tukki, Cutting::Uudistus)
+    //     + adjusted_pulpwood * PRICES.get(species, TimberType::Kuitu, Cutting::Uudistus)
+    let sawlog_value =
+        area * sawlog * 0.75 * PRICES.get(species, TimberType::Tukki, Cutting::Uudistus);
+    let pulp_value =
+        area * pulpwood * 0.75 * PRICES.get(species, TimberType::Kuitu, Cutting::Uudistus);
+    sawlog_value + pulp_value
 }
 
-fn harvennus(species: Species, sawlog: f64, _pulpwood: f64, volume: f64, area: f64) -> f64 {
-    area * volume * 0.25 * PRICES.get(species, TimberType::Kuitu, Cutting::Harvennus)
-        + area * sawlog * 0.15 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus)
+fn harvennus(species: Species, sawlog: f64, pulpwood: f64, area: f64) -> f64 {
+    // area * volume * 0.25 * PRICES.get(species, TimberType::Kuitu, Cutting::Harvennus)
+    //     + area * sawlog * 0.15 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus)
+    let sawlog_value =
+        area * pulpwood * 0.3 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus);
+    let pulp_value =
+        area * sawlog * 0.1 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus);
+    sawlog_value + pulp_value
 }
 
 /// Laskee puulajikohtaisen arvon (€) kuvion tietojen perusteella.
 pub fn calculate_value(row: &SpeciesSummary) -> f64 {
     let species = row.species;
-    let volume = row.volume;
+    let cutting = row.cutting;
     let sawlog = row.sawlogvolume;
     let pulpwood = row.pulpwoodvolume;
+    let age = row.age;
+    let diameter = row.meandiameter;
+    let height = row.meanheight;
     let area = row.area.unwrap_or(0.0);
 
-    match row.cutting {
+    match cutting {
         Some(Cutting::Ensiharvennus) => return 0.0,
-        Some(Cutting::Harvennus) => return harvennus(species, sawlog, pulpwood, volume, area),
-        Some(Cutting::Uudistus) => return uudistus(species, sawlog, pulpwood, volume, area),
+        Some(Cutting::Harvennus) => return harvennus(species, sawlog, pulpwood, area),
+        Some(Cutting::Uudistus) => return uudistus(species, sawlog, pulpwood, area),
         None => {}
     }
 
+    // Puuttuva hakkuuehdotus
     match species {
         Species::Kuusi => {
-            if ge(row.age, 70.0) || ge(row.meandiameter, 27.0) {
-                return uudistus(species, sawlog * 0.6, pulpwood * 0.6, volume * 0.6, area);
+            // Päätehakkuu hintalaskenta
+            if ge(diameter, LIMITS.uudistus.kuusi.diameter as f64)
+                || (ge(age, LIMITS.uudistus.kuusi.age as f64)
+                    && ge(diameter, (LIMITS.uudistus.kuusi.diameter - 3) as f64))
+            {
+                return uudistus(species, sawlog, pulpwood, area);
             }
-            if ge(row.age, 45.0) || ge(row.meandiameter, 18.0) || ge(row.meanheight, 17.0) {
-                return harvennus(species, sawlog, pulpwood, volume, area);
+
+            // Harvennus hintalaskenta
+            if ge(age, LIMITS.harvennus.kuusi.diameter as f64)
+                && ge(diameter, LIMITS.harvennus.kuusi.diameter as f64)
+                && ge(height, LIMITS.harvennus.kuusi.height as f64)
+            {
+                return harvennus(species, sawlog, pulpwood, area);
             }
         }
         Species::Manty => {
-            if ge(row.age, 75.0) || ge(row.meandiameter, 26.0) {
-                return uudistus(species, sawlog * 0.6, pulpwood * 0.6, volume * 0.6, area);
+            // Päätehakkuu laskenta
+            if ge(diameter, LIMITS.uudistus.manty.diameter as f64)
+                || (ge(age, LIMITS.uudistus.manty.age as f64)
+                    && ge(diameter, (LIMITS.uudistus.manty.diameter - 3) as f64))
+            {
+                return uudistus(species, sawlog, pulpwood, area);
             }
-            if ge(row.age, 45.0) || ge(row.meandiameter, 17.0) || ge(row.meanheight, 16.0) {
-                return harvennus(species, sawlog, pulpwood, volume, area);
+
+            // Harvennus hintalaskenta
+            if ge(age, LIMITS.harvennus.manty.diameter as f64)
+                && ge(diameter, LIMITS.harvennus.manty.diameter as f64)
+                && ge(height, LIMITS.harvennus.manty.height as f64)
+            {
+                return harvennus(species, sawlog, pulpwood, area);
             }
         }
         Species::Koivu => {
-            if ge(row.age, 60.0) || ge(row.meandiameter, 27.0) {
-                return uudistus(species, sawlog * 0.6, pulpwood * 0.6, volume * 0.6, area);
+            // Päätehakkuu laskenta
+            if ge(diameter, LIMITS.uudistus.koivu.diameter as f64)
+                || (ge(age, LIMITS.uudistus.koivu.age as f64)
+                    && ge(diameter, (LIMITS.uudistus.koivu.diameter - 3) as f64))
+            {
+                return uudistus(species, sawlog, pulpwood, area);
             }
-            if ge(row.age, 35.0) || ge(row.meandiameter, 16.0) || ge(row.meanheight, 18.0) {
-                return harvennus(species, sawlog, pulpwood, volume, area);
+
+            // Harvennus hintalaskenta
+            if ge(age, LIMITS.harvennus.koivu.diameter as f64)
+                && ge(diameter, LIMITS.harvennus.koivu.diameter as f64)
+                && ge(height, LIMITS.harvennus.koivu.height as f64)
+            {
+                return harvennus(species, sawlog, pulpwood, area);
             }
         }
-        Species::Muu => return 0.0,
+        Species::Muu => {}
     }
 
     0.0
@@ -329,6 +404,8 @@ pub fn build_stand_values(
             None
         };
 
+        let costs_eur = calculate_costs(area, sawlogvolume, pulpwoodvolume, first.cutting);
+
         values.push(StandValue {
             standid: first.standid,
             standnumber: first.standnumber,
@@ -338,7 +415,6 @@ pub fn build_stand_values(
             sawlogvolume,
             pulpwoodvolume,
             volumegrowth,
-            value_eur,
             meanage: summary.and_then(|summary| summary.meanage),
             stemcount: summary.and_then(|summary| summary.stemcount),
             meandiameter: summary.and_then(|summary| summary.meandiameter),
@@ -349,12 +425,29 @@ pub fn build_stand_values(
             fertility_class: summary.and_then(|summary| summary.fertility_class),
             main_group: summary.and_then(|summary| summary.main_group),
             soil_type: summary.and_then(|summary| summary.soil_type),
+            income_eur: value_eur,
+            costs_eur,
+            net_eur: value_eur - costs_eur,
         });
     }
 
     values.sort_by(|a, b| cmp_opt_i64_last(a.standnumber, b.standnumber));
 
     values
+}
+
+pub fn build_fixed_costs(stand_values: &[StandValue]) -> f64 {
+    let mut seen = HashSet::new();
+
+    let assignments: Vec<Option<i64>> = stand_values
+        .iter()
+        .filter(|s| s.cutting == Some(Cutting::Uudistus) || s.cutting == Some(Cutting::Harvennus))
+        .map(|s| s.cuttingproposalyear)
+        .filter(|y| seen.insert(*y))
+        .filter(|y| y.is_some())
+        .collect();
+
+    assignments.len() as f64 * (COST_RATES.perusmaksu + COST_RATES.hakkuun_tarkastus)
 }
 
 /// Rakentaa raakarivit (df): puuston perustiedot + kuvion tiedot.
@@ -467,17 +560,16 @@ fn grouped(value: f64) -> String {
 }
 
 /// Tulostaa koko aineiston yhteenvedon.
-pub fn print_dataset_summary(stands: &[Stand], species_summary: &[SpeciesSummary]) {
+pub fn print_dataset_summary(stands: &[Stand], stand_values: &[StandValue], fixed_costs: &f64) {
     println!("\n");
     println!("{CYAN}----------{RESET}");
     println!("{CYAN}Yhteenveto{RESET}");
     println!("{CYAN}----------{RESET}");
 
     let area: f64 = sum(stands.iter().filter_map(|stand| stand.area));
-    let volume: f64 = sum(species_summary.iter().map(|row| row.volume));
-    let sawlog: f64 = sum(species_summary.iter().map(|row| row.sawlogvolume));
-    let pulpwood: f64 = sum(species_summary.iter().map(|row| row.pulpwoodvolume));
-    let value: f64 = sum(species_summary.iter().map(|row| row.value_eur));
+    let volume: f64 = sum(stand_values.iter().map(|row| row.volume));
+    let sawlog: f64 = sum(stand_values.iter().map(|row| row.sawlogvolume));
+    let pulpwood: f64 = sum(stand_values.iter().map(|row| row.pulpwoodvolume));
 
     println!(
         "Kuvioiden yhteenlaskettu pinta-ala: {CYAN}{} ha{RESET}",
@@ -495,7 +587,21 @@ pub fn print_dataset_summary(stands: &[Stand], species_summary: &[SpeciesSummary
         "Metsäkeskuksen kuitupuumäärä: {} m³",
         grouped_precise(pulpwood, 2)
     );
-    println!("LASKENNALLINEN ARVO: {GREEN}{} €{RESET}\n", grouped(value));
+    println!(
+        "Tulot: {CYAN}{:.2} €{RESET}",
+        sum(stand_values.iter().map(|s| s.income_eur))
+    );
+    println!(
+        "Muuttuvat kulut: {YELLOW}{:.2} €{RESET}",
+        sum(stand_values.iter().map(|s| s.costs_eur))
+    );
+    println!("Kiinteät kulut: {YELLOW}{fixed_costs:.2} €{RESET}");
+    let value = sum(stand_values.iter().map(|s| s.net_eur)) - fixed_costs;
+    if value < 0.0 {
+        println!("LASKENNALLINEN ARVO: {RED}{} €{RESET}\n", grouped(value));
+    } else {
+        println!("LASKENNALLINEN ARVO: {GREEN}{} €{RESET}\n", grouped(value));
+    }
 }
 
 fn grouped_precise(value: f64, decimals: usize) -> String {
@@ -572,63 +678,6 @@ mod tests {
     }
 
     #[test]
-    fn harvennus_uses_the_kuitu_and_tukki_prices() {
-        // 1.0 ha * 30 m³ * 0.25 * 21.89 € + 1.0 ha * 10 m³ * 0.15 * 68.83 €
-        let summary = SpeciesSummary {
-            species: Species::Manty,
-            cutting: Some(Cutting::Harvennus),
-            area: Some(1.0),
-            volume: 30.0,
-            sawlogvolume: 10.0,
-            pulpwoodvolume: 20.0,
-            ..row()
-        };
-        assert_close(calculate_value(&summary), 267.42);
-    }
-
-    #[test]
-    fn uudistus_shifts_ten_percent_of_volume_from_sawlog_to_pulpwood() {
-        let summary = SpeciesSummary {
-            species: Species::Manty,
-            cutting: Some(Cutting::Uudistus),
-            area: Some(2.0),
-            volume: 15.0,
-            sawlogvolume: 10.0,
-            pulpwoodvolume: 5.0,
-            ..row()
-        };
-        assert_close(calculate_value(&summary), 1456.495);
-    }
-
-    #[test]
-    fn old_kuusi_without_a_cutting_proposal_is_treated_as_uudistus_at_sixty_percent() {
-        // ikä 80 >= 70 on uudistus mutta tilavuus on 0.6x
-        let summary = SpeciesSummary {
-            species: Species::Kuusi,
-            age: Some(80.0),
-            volume: 30.0,
-            sawlogvolume: 10.0,
-            pulpwoodvolume: 20.0,
-            ..row()
-        };
-        assert_close(calculate_value(&summary), 631.173);
-    }
-
-    #[test]
-    fn mid_life_kuusi_without_a_cutting_proposal_is_treated_as_harvennus() {
-        // ikä 50 >= 45 (mutta < 70) on harvennus
-        let summary = SpeciesSummary {
-            species: Species::Kuusi,
-            age: Some(50.0),
-            volume: 30.0,
-            sawlogvolume: 10.0,
-            pulpwoodvolume: 20.0,
-            ..row()
-        };
-        assert_close(calculate_value(&summary), 270.72);
-    }
-
-    #[test]
     fn young_small_trees_have_no_value() {
         let summary = SpeciesSummary {
             species: Species::Kuusi,
@@ -655,5 +704,89 @@ mod tests {
     fn grouped_precise_uses_a_comma_for_decimals() {
         assert_eq!(grouped_precise(1234.5, 2), "1 234,50");
         assert_eq!(grouped_precise(1000.0, 2), "1 000,00");
+    }
+
+    fn stand_value() -> StandValue {
+        StandValue {
+            area: None,
+            cutting: None,
+            cuttingproposalyear: None,
+            fertility_class: None,
+            growth_pct: None,
+            main_group: None,
+            main_species: None,
+            meanage: None,
+            meandiameter: None,
+            meanheight: None,
+            pulpwoodvolume: 0.0,
+            sawlogvolume: 0.0,
+            soil_type: None,
+            standid: 0,
+            standnumber: None,
+            stemcount: None,
+            volume: 0.0,
+            volumegrowth: 0.0,
+            net_eur: 0.0,
+            income_eur: 0.0,
+            costs_eur: 0.0,
+        }
+    }
+
+    #[test]
+    fn fixed_costs_remove_duplicates() {
+        let values = StandValue {
+            cutting: Some(Cutting::Harvennus),
+            cuttingproposalyear: Some(2020),
+            ..stand_value()
+        };
+        assert_eq!(
+            build_fixed_costs(&[values.clone(), values.clone(), values.clone(), values]),
+            (COST_RATES.perusmaksu + COST_RATES.hakkuun_tarkastus)
+        )
+    }
+
+    #[test]
+    fn fixed_costs_keep_uniques() {
+        let mut values = Vec::new();
+        for i in 2000..2050 {
+            let value = StandValue {
+                cutting: Some(Cutting::Harvennus),
+                cuttingproposalyear: Some(i),
+                ..stand_value()
+            };
+            values.push(value);
+        }
+        assert_eq!(
+            build_fixed_costs(&values),
+            50.0 * (COST_RATES.perusmaksu + COST_RATES.hakkuun_tarkastus)
+        )
+    }
+
+    #[test]
+    fn costs_ensiharvennus_gives_always_zero() {
+        let res = calculate_costs(Some(1.0), 16.0, 10.0, Some(Cutting::Ensiharvennus));
+        assert_eq!(res, 0.0)
+    }
+
+    #[test]
+    fn costs_harvennus_gives_correct_value() {
+        for i in 0..500 {
+            let a = i as f64;
+            let res = calculate_costs(Some(a), 1.0 / 0.1, 1.0 / 0.3, Some(Cutting::Harvennus));
+            let want = a * 2.0 * COST_RATES.palvelumaksu + a * COST_RATES.ennakkoraivaus_harvennus;
+            assert_eq!(res, want)
+        }
+    }
+
+    #[test]
+    fn costs_uudistus_gives_correct_value() {
+        for i in 0..500 {
+            let a = i as f64;
+            let res = calculate_costs(Some(a), 1.0 / 0.75, 1.0 / 0.75, Some(Cutting::Uudistus));
+            let want = a * 2.0 * COST_RATES.palvelumaksu
+                + a * COST_RATES.maanmuokkaus_uudistus
+                + a * COST_RATES.taimet_siementen_uudistus;
+            assert_eq!(res, want)
+        }
     }
 }

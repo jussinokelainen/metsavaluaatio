@@ -104,7 +104,6 @@ pub struct StandValue {
     pub sawlogvolume: f64,
     pub pulpwoodvolume: f64,
     pub volumegrowth: f64,
-    pub value_eur: f64,
     pub meanage: Option<f64>,
     pub stemcount: Option<f64>,
     pub meandiameter: Option<f64>,
@@ -115,6 +114,9 @@ pub struct StandValue {
     pub fertility_class: Option<i64>,
     pub main_group: Option<i64>,
     pub soil_type: Option<i64>,
+    pub income_eur: f64,
+    pub costs_eur: f64,
+    pub net_eur: f64,
 }
 
 /// Raakarivi (df), jossa puuston perustiedot ja kuvion tiedot yhdistettynä.

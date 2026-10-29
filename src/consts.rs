@@ -183,6 +183,86 @@ pub const PRICES: PriceList = PriceList {
     },
 };
 
+#[allow(dead_code)]
+pub struct StandCosts {
+    pub perusmaksu: f64,
+    pub hakkuun_tarkastus: f64,
+    pub palvelumaksu: f64,
+    pub maanmuokkaus_uudistus: f64,
+    pub ennakkoraivaus_harvennus: f64,
+    pub taimet_siementen_uudistus: f64,
+}
+
+/// Perusmaksu: €/toimeksianto
+/// Hakkuun_Tarkastus: €/toimeksianto
+/// Palvelumaksu: €/m³
+/// Maanmuokkaus_Uudistus: €/ha
+/// Ennakkoraivaus_Harvennus: €/ha
+/// Taimet_Siementen_Uudistus: €/ha
+pub const COST_RATES: StandCosts = {
+    StandCosts {
+        perusmaksu: 603.0,
+        hakkuun_tarkastus: 306.0,
+        palvelumaksu: 0.5,
+        maanmuokkaus_uudistus: 720.0,
+        ennakkoraivaus_harvennus: 396.0,
+        taimet_siementen_uudistus: 688.0,
+    }
+};
+
+pub struct SpeciesValueLimits {
+    pub age: i64,
+    pub diameter: i64,
+    pub height: i64,
+}
+
+pub struct CutTypeValueLimits {
+    pub kuusi: SpeciesValueLimits,
+    pub manty: SpeciesValueLimits,
+    pub koivu: SpeciesValueLimits,
+}
+pub struct ValueLimits {
+    pub uudistus: CutTypeValueLimits,
+    pub harvennus: CutTypeValueLimits,
+}
+
+pub const LIMITS: ValueLimits = ValueLimits {
+    uudistus: CutTypeValueLimits {
+        kuusi: SpeciesValueLimits {
+            age: 80,
+            diameter: 27,
+            height: 0,
+        },
+        manty: SpeciesValueLimits {
+            age: 90,
+            diameter: 25,
+            height: 0,
+        },
+        koivu: SpeciesValueLimits {
+            age: 60,
+            diameter: 27,
+            height: 0,
+        },
+    },
+    harvennus: CutTypeValueLimits {
+        kuusi: SpeciesValueLimits {
+            age: 35,
+            diameter: 12,
+            height: 12,
+        },
+        manty: SpeciesValueLimits {
+            age: 30,
+            diameter: 11,
+            height: 11,
+        },
+        koivu: SpeciesValueLimits {
+            age: 25,
+            diameter: 12,
+            height: 14,
+        },
+    },
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
