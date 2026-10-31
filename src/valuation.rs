@@ -564,48 +564,47 @@ fn grouped(value: f64) -> String {
 }
 
 /// Tulostaa koko aineiston yhteenvedon.
-pub fn print_dataset_summary(stands: &[Stand], stand_values: &[StandValue], fixed_costs: &f64) {
-    println!("\n");
-    println!("{CYAN}----------{RESET}");
-    println!("{CYAN}Yhteenveto{RESET}");
-    println!("{CYAN}----------{RESET}");
+pub fn create_dataset_summary(
+    stands: &[Stand],
+    stand_values: &[StandValue],
+    fixed_costs: &f64,
+) -> String {
+    let mut summary = String::new();
+    summary.push_str(&format!("\n"));
+    summary.push_str(&format!(
+        "
+{CYAN}----------{RESET}
+{CYAN}Yhteenveto{RESET}
+{CYAN}----------{RESET}"
+    ));
 
     let area: f64 = sum(stands.iter().filter_map(|stand| stand.area));
     let volume: f64 = sum(stand_values.iter().map(|row| row.volume));
     let sawlog: f64 = sum(stand_values.iter().map(|row| row.sawlogvolume));
     let pulpwood: f64 = sum(stand_values.iter().map(|row| row.pulpwoodvolume));
 
-    println!(
-        "Kuvioiden yhteenlaskettu pinta-ala: {CYAN}{} ha{RESET}",
-        grouped_precise(area, 2)
-    );
-    println!(
-        "Puuston kokonaismäärä: {CYAN}{} m³{RESET}",
-        grouped_precise(volume, 2)
-    );
-    println!(
-        "Metsäkeskuksen tukkimäärä: {} m³",
-        grouped_precise(sawlog, 2)
-    );
-    println!(
-        "Metsäkeskuksen kuitupuumäärä: {} m³",
-        grouped_precise(pulpwood, 2)
-    );
-    println!(
-        "Tulot: {CYAN}{:.2} €{RESET}",
-        sum(stand_values.iter().map(|s| s.income_eur))
-    );
-    println!(
-        "Muuttuvat kulut: {YELLOW}{:.2} €{RESET}",
-        sum(stand_values.iter().map(|s| s.costs_eur))
-    );
-    println!("Kiinteät kulut: {YELLOW}{fixed_costs:.2} €{RESET}");
     let value = sum(stand_values.iter().map(|s| s.net_eur)) - fixed_costs;
-    if value < 0.0 {
-        println!("LASKENNALLINEN ARVO: {RED}{} €{RESET}\n", grouped(value));
-    } else {
-        println!("LASKENNALLINEN ARVO: {GREEN}{} €{RESET}\n", grouped(value));
-    }
+    summary.push_str(&format!(
+        "
+Kuvioiden yhteenlaskettu pinta-ala: {CYAN}{} ha{RESET}
+Puuston kokonaismäärä: {CYAN}{} m³{RESET}
+Metsäkeskuksen tukkimäärä: {} m³
+Metsäkeskuksen kuitupuumäärä: {} m³
+Tulot: {CYAN}{:.2} €{RESET}
+Muuttuvat kulut: {YELLOW}{:.2} €{RESET}
+Kiinteät kulut: {YELLOW}{fixed_costs:.2} €{RESET}
+LASKENNALLINEN ARVO: {}{} €{RESET}\n",
+        grouped_precise(area, 2),
+        grouped_precise(volume, 2),
+        grouped_precise(sawlog, 2),
+        grouped_precise(pulpwood, 2),
+        sum(stand_values.iter().map(|s| s.income_eur)),
+        sum(stand_values.iter().map(|s| s.costs_eur)),
+        if value > 0.0 { GREEN } else { RED },
+        grouped(value)
+    ));
+
+    summary
 }
 
 fn grouped_precise(value: f64, decimals: usize) -> String {
@@ -660,13 +659,6 @@ mod tests {
             growth_pct: None,
             value_eur: 0.0,
         }
-    }
-
-    fn assert_close(actual: f64, expected: f64) {
-        assert!(
-            (actual - expected).abs() < 1e-9,
-            "expected {expected}, got {actual}"
-        );
     }
 
     #[test]

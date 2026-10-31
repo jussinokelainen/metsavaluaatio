@@ -162,7 +162,9 @@ fn main() -> Result<()> {
     let fixed_costs = metsaval::valuation::build_fixed_costs(&stand_values);
 
     // Tulostus
-    metsaval::valuation::print_dataset_summary(&stands, &stand_values, &fixed_costs);
+    let summary_str =
+        metsaval::valuation::create_dataset_summary(&stands, &stand_values, &fixed_costs);
+    println!("{summary_str}");
 
     // Kysy käyttäjältä luodaanko tiedostot
     if !ask_file_creation() {
