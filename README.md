@@ -55,7 +55,7 @@ metsaval --aseta-api <api-key>
 Api-avaimen lisäämisen jälkeen ohjelman käyttö:
 
 ```bash
-metsaval 012-345-0006-0789
+metsaval 12-345-6-789
 ```
 
 Ohjelma vaatii parametrina kiinteistötunnuksen kuten yllä olevassa esimerkissä.
@@ -76,7 +76,7 @@ tätä flagia voi välttää GeoPackage:n lataamisen joka kerta uudestaan, jos t
 kiinteistön olevan samassa kunnassa kuin aikaisemmin haetun kiinteistön GeoPackage, esim:
 
 ```bash
-metsaval 012-345-0006-0789 --gpkg-tiedosto /tmp/metsavaluaatio_123456/MV_Kunta.gpkg
+metsaval 12-345-6-789 --gpkg-tiedosto /tmp/metsavaluaatio_123456/MV_Kunta.gpkg
 ```
 
 HUOM! Tällä hetkellä ei ole mitään takuita mitä tapahtuu jos antaa virheellistä dataa näillä flageilla!
