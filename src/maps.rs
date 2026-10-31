@@ -23,9 +23,14 @@ fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
     kml.push_str("            <ExtendedData>\n");
 
     kml.push_str(&new_data(
-        "Arvo",
+        "Tulot",
         Some(format!("{:.2} €", values.income_eur)),
     ));
+    kml.push_str(&new_data(
+        "Menot",
+        Some(format!("{:.2} €", values.costs_eur)),
+    ));
+    kml.push_str(&new_data("Netto", Some(format!("{:.2} €", values.net_eur))));
     kml.push_str(&new_data("Pinta-ala (ha)", values.area));
     kml.push_str(&new_data("Runkoluku kpl/ha", values.stemcount));
     kml.push_str(&new_data("Keski-ikä", values.meanage));

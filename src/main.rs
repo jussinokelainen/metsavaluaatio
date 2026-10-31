@@ -191,7 +191,7 @@ fn main() -> Result<()> {
     }
 
     // Excel-yhteenveto
-    let totals = metsaval::valuation::compute_totals(&stands, &species_summary);
+    let totals = metsaval::valuation::compute_totals(&stands, &stand_values);
     let excel_file = match &output_file_dir {
         Some(dir) => dir.join(generate_filename(property_id, ".xlsx")),
         None => PathBuf::from(generate_filename(property_id, ".xlsx")),
@@ -203,6 +203,7 @@ fn main() -> Result<()> {
         &species_summary,
         &timber_values,
         &raw_rows,
+        &fixed_costs,
     )?;
 
     // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen

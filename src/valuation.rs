@@ -505,7 +505,7 @@ pub fn build_raw_rows(
 }
 
 /// Laskee koko aineiston tunnusluvut (Excelin Yhteenveto-välilehti).
-pub fn compute_totals(stands: &[Stand], species_summary: &[SpeciesSummary]) -> Totals {
+pub fn compute_totals(stands: &[Stand], species_summary: &[StandValue]) -> Totals {
     let stand_ids: BTreeSet<i64> = stands.iter().filter_map(|stand| stand.standid).collect();
 
     let area_ha = sum(stands.iter().filter_map(|stand| stand.area));
@@ -522,7 +522,9 @@ pub fn compute_totals(stands: &[Stand], species_summary: &[SpeciesSummary]) -> T
     let growth_m3_per_year = sum(species_summary
         .iter()
         .map(|row| row.volumegrowth * row.area.unwrap_or(0.0)));
-    let value_eur = sum(species_summary.iter().map(|row| row.value_eur));
+    let income_eur = sum(species_summary.iter().map(|row| row.income_eur));
+    let costs_eur = sum(species_summary.iter().map(|row| row.costs_eur));
+    let net_eur = sum(species_summary.iter().map(|row| row.net_eur));
 
     Totals {
         stand_count: stand_ids.len() as i64,
@@ -531,7 +533,9 @@ pub fn compute_totals(stands: &[Stand], species_summary: &[SpeciesSummary]) -> T
         sawlog_m3,
         pulpwood_m3,
         growth_m3_per_year,
-        value_eur,
+        income_eur,
+        costs_eur,
+        net_eur,
     }
 }
 

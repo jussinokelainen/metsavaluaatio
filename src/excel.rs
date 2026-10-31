@@ -121,8 +121,9 @@ pub fn export(
     species_summary: &[SpeciesSummary],
     timber_values: &[TimberValue],
     raw_rows: &[RawRow],
+    fixed_costs: &f64,
 ) -> Result<()> {
-    let summary = summary_sheet(totals);
+    let summary = summary_sheet(totals, fixed_costs);
     let stand_sheet = stand_sheet(stand_values);
     let species_sheet = species_sheet(species_summary);
     let timber_sheet = timber_sheet(timber_values);
@@ -142,7 +143,7 @@ pub fn export(
     )
 }
 
-fn summary_sheet(totals: &Totals) -> Sheet {
+fn summary_sheet(totals: &Totals, fixed_costs: &f64) -> Sheet {
     Sheet {
         name: "Yhteenveto".to_string(),
         headers: headers(&["Tunnusluku", "Arvo"]),
@@ -159,10 +160,10 @@ fn summary_sheet(totals: &Totals) -> Sheet {
                 text("Puuston kokonaiskasvu, m³/v"),
                 Cell::Num(totals.growth_m3_per_year),
             ],
-            vec![
-                text("Laskennallinen puuston arvo, €"),
-                Cell::Num(totals.value_eur),
-            ],
+            vec![text("Tulot, €"), Cell::Num(totals.income_eur)],
+            vec![text("Muuttuvat kulut, €"), Cell::Num(totals.costs_eur)],
+            vec![text("Kiinteät kulut, €"), Cell::Num(*fixed_costs)],
+            vec![text("Netto, €"), Cell::Num(totals.net_eur - fixed_costs)],
         ],
     }
 }
@@ -183,7 +184,9 @@ fn stand_sheet(stand_values: &[StandValue]) -> Sheet {
         "Kuitupuuta, m³/ha",
         "Tilavuuskasvu, m³/ha/v",
         "Tilavuuskasvu, %",
-        "Arvo, €",
+        "Tulot, €",
+        "Menot, €",
+        "Netto, €",
     ]);
 
     let rows = stand_values
@@ -205,6 +208,8 @@ fn stand_sheet(stand_values: &[StandValue]) -> Sheet {
                 Cell::Num(row.volumegrowth),
                 opt_num(row.growth_pct),
                 Cell::Num(row.income_eur),
+                Cell::Num(row.costs_eur),
+                Cell::Num(row.net_eur),
             ]
         })
         .collect();

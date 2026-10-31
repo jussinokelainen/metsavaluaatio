@@ -156,5 +156,7 @@ pub struct Totals {
     pub sawlog_m3: f64,
     pub pulpwood_m3: f64,
     pub growth_m3_per_year: f64,
-    pub value_eur: f64,
+    pub income_eur: f64,
+    pub costs_eur: f64,
+    pub net_eur: f64,
 }
