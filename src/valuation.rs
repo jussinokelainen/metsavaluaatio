@@ -253,14 +253,17 @@ pub fn tree_net_gain(
     diameter: Option<f64>,
     height: Option<f64>,
     stemcount: f64,
-    v_tukki: f64,
-    v_kuitu: f64,
+    v_sawlog: f64,
+    v_pulpwood: f64,
     v_growth: f64,
     q: Option<f64>,
 ) -> f64 {
+    // Ennen laskuja tarkistaa funktion ottavat Option parametrit
     let height = height.unwrap_or(0.0);
-    let diameter = diameter.unwrap_or(0.0);
-    let (tmax, k, gtav, q_oletus) = match puulaji {
+    let Some(diameter) = diameter else { return 0.0 };
+
+    // Valitsee oikean puulajin Tmax, k, Gtav ja q arvot
+    let (tmax, k, gtav, q_default) = match puulaji {
         Species::Kuusi => {
             let species = PUULAJIT_VALUEGROWTH.kuusi;
             (species.tmax, species.k, species.gtav, species.q)
@@ -276,12 +279,14 @@ pub fn tree_net_gain(
         Species::Muu => return 0.0,
     };
 
+    // Jos funktion kutsuja antoi q arvon, käyttää sitä
     let q = match q {
         Some(q) => q,
-        None => q_oletus,
+        None => q_default,
     };
-    let t0 = v_tukki / (v_tukki + v_kuitu);
-    let g = v_growth / (v_tukki + v_kuitu);
+
+    let t0 = v_sawlog / (v_sawlog + v_pulpwood);
+    let g = v_growth / (v_sawlog + v_pulpwood);
     let s = 100.0 * height / diameter;
     let g_upper = 0.0000785 * stemcount * diameter.powi(2);
     let beta = 0.95_f64.min(0.55_f64.max(1.35 - 0.0075 * s - 0.010 * (g_upper - gtav)));
@@ -298,13 +303,13 @@ pub fn tree_net_gain(
     } else {
         tmax.min(t0 + fh * k * i * t0 * (1.0 - t0 / tmax))
     };
-    let arvo0 = 1.0 + (q - 1.0) * t0;
-    let arvo1 = (1.0 + g) * (1.0 + (q - 1.0) * t1);
+    let value0 = 1.0 + (q - 1.0) * t0;
+    let value1 = (1.0 + g) * (1.0 + (q - 1.0) * t1);
 
-    arvo1 / arvo0 - 1.0
+    value1 / value0 - 1.0
 }
 
-/// Laskee puulajikohtaisen arvon (€) kuvion tietojen perusteella.
+/// Laskee puulajikohtaisen arvokasvun (€) kuvion tietojen perusteella.
 pub fn calculate_value_growth(row: &SpeciesSummary) -> Option<f64> {
     let total_volume = row.volume;
     let sawlog = row.sawlogvolume;
