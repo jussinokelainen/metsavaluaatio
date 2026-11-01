@@ -77,6 +77,7 @@ pub struct SpeciesSummary {
     pub pulpwoodvolume: f64,
     pub volumegrowth: f64,
     pub growth_pct: Option<f64>,
+    pub value_growth_pct: Option<f64>,
     pub value_eur: f64,
 }
 

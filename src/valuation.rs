@@ -1,5 +1,5 @@
 use crate::consts::{COST_RATES, CYAN, GREEN, LIMITS, RED, RESET, YELLOW};
-use crate::consts::{Cutting, PRICES, Species, TimberType};
+use crate::consts::{Cutting, PRICES, PUULAJIT_VALUEGROWTH, Species, TimberType};
 use crate::model::{
     RawRow, SpeciesSummary, Stand, StandSummary, StandValue, TimberValue, Totals, TreeStratum,
 };
@@ -161,9 +161,11 @@ pub fn build_species_summary(
             pulpwoodvolume,
             volumegrowth,
             growth_pct,
+            value_growth_pct: Some(0.0),
             value_eur: 0.0,
         };
 
+        summary.value_growth_pct = calculate_value_growth(&summary);
         summary.value_eur = calculate_value(&summary);
         summaries.push(summary);
     }
@@ -242,6 +244,88 @@ fn harvennus(species: Species, sawlog: f64, pulpwood: f64, area: f64) -> f64 {
     let pulp_value =
         area * sawlog * 0.1 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus);
     sawlog_value + pulp_value
+}
+
+/// diameter=cm, height=cm, stemcount=runkoa/ha, v_* m³/ha.
+/// Palauttaa 0.028 = 2.8 %.
+pub fn tree_net_gain(
+    puulaji: Species,
+    diameter: Option<f64>,
+    height: Option<f64>,
+    stemcount: f64,
+    v_tukki: f64,
+    v_kuitu: f64,
+    v_growth: f64,
+    q: Option<f64>,
+) -> f64 {
+    let height = height.unwrap_or(0.0);
+    let diameter = diameter.unwrap_or(0.0);
+    let (tmax, k, gtav, q_oletus) = match puulaji {
+        Species::Kuusi => {
+            let species = PUULAJIT_VALUEGROWTH.kuusi;
+            (species.tmax, species.k, species.gtav, species.q)
+        }
+        Species::Koivu => {
+            let species = PUULAJIT_VALUEGROWTH.koivu;
+            (species.tmax, species.k, species.gtav, species.q)
+        }
+        Species::Manty => {
+            let species = PUULAJIT_VALUEGROWTH.manty;
+            (species.tmax, species.k, species.gtav, species.q)
+        }
+        Species::Muu => return 0.0,
+    };
+
+    let q = match q {
+        Some(q) => q,
+        None => q_oletus,
+    };
+    let t0 = v_tukki / (v_tukki + v_kuitu);
+    let g = v_growth / (v_tukki + v_kuitu);
+    let s = 100.0 * height / diameter;
+    let g_upper = 0.0000785 * stemcount * diameter.powi(2);
+    let beta = 0.95_f64.min(0.55_f64.max(1.35 - 0.0075 * s - 0.010 * (g_upper - gtav)));
+    let i = beta * g * diameter / 2.0;
+    let fh = if height < 12.0 {
+        0.0
+    } else if height < 17.0 {
+        1.15
+    } else {
+        1.0
+    };
+    let t1 = if t0 < 0.005 {
+        t0
+    } else {
+        tmax.min(t0 + fh * k * i * t0 * (1.0 - t0 / tmax))
+    };
+    let arvo0 = 1.0 + (q - 1.0) * t0;
+    let arvo1 = (1.0 + g) * (1.0 + (q - 1.0) * t1);
+
+    arvo1 / arvo0 - 1.0
+}
+
+/// Laskee puulajikohtaisen arvon (€) kuvion tietojen perusteella.
+pub fn calculate_value_growth(row: &SpeciesSummary) -> Option<f64> {
+    let total_volume = row.volume;
+    let sawlog = row.sawlogvolume;
+    let pulpwood = row.pulpwoodvolume;
+    let sawlog_percentage = sawlog / (pulpwood + sawlog);
+    let sawlog_corr = sawlog_percentage * total_volume;
+    let pulpwood_corr = (1.0 - sawlog_percentage) * total_volume;
+
+    Some(
+        100.0
+            * tree_net_gain(
+                row.species,
+                row.meandiameter,
+                row.meanheight,
+                row.stemcount,
+                sawlog_corr,
+                pulpwood_corr,
+                row.volumegrowth,
+                None,
+            ),
+    )
 }
 
 /// Laskee puulajikohtaisen arvon (€) kuvion tietojen perusteella.
@@ -658,6 +742,7 @@ mod tests {
             volumegrowth: 0.0,
             growth_pct: None,
             value_eur: 0.0,
+            value_growth_pct: None,
         }
     }
 

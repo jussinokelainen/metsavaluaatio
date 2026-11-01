@@ -206,7 +206,7 @@ pub const COST_RATES: StandCosts = {
         palvelumaksu: 0.5,
         maanmuokkaus_uudistus: 720.0,
         ennakkoraivaus_harvennus: 396.0,
-        taimet_siementen_uudistus: 688.0,
+        taimet_siementen_uudistus: 1120.0,
     }
 };
 
@@ -260,6 +260,41 @@ pub const LIMITS: ValueLimits = ValueLimits {
             diameter: 12,
             height: 14,
         },
+    },
+};
+
+pub struct ValueGrowthSpecies {
+    pub tmax: f64,
+    pub k: f64,
+    pub gtav: f64,
+    pub q: f64,
+}
+
+pub struct ValueGrowth {
+    pub kuusi: ValueGrowthSpecies,
+    pub manty: ValueGrowthSpecies,
+    pub koivu: ValueGrowthSpecies,
+}
+
+/// puulaji: (tmax, k, gtav, q) q = tukin hintasuhde kuituun
+pub const PUULAJIT_VALUEGROWTH: ValueGrowth = ValueGrowth {
+    kuusi: ValueGrowthSpecies {
+        tmax: 0.89,
+        k: 0.261,
+        gtav: 26.0,
+        q: 3.0,
+    },
+    manty: ValueGrowthSpecies {
+        tmax: 0.90,
+        k: 0.275,
+        gtav: 22.0,
+        q: 3.0,
+    },
+    koivu: ValueGrowthSpecies {
+        tmax: 0.72,
+        k: 0.220,
+        gtav: 20.0,
+        q: 2.2,
     },
 };
 

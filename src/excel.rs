@@ -238,7 +238,8 @@ fn species_sheet(species_summary: &[SpeciesSummary]) -> Sheet {
         "Kuitupuuta, m³/ha",
         "Tilavuuskasvu, m³/ha/v",
         "Tilavuuskasvu, %",
-        "Arvo, €",
+        "Tulot, €",
+        "Arvokasvu, %",
     ]);
 
     let rows = species_summary
@@ -261,6 +262,7 @@ fn species_sheet(species_summary: &[SpeciesSummary]) -> Sheet {
                 Cell::Num(row.volumegrowth),
                 opt_num(row.growth_pct),
                 Cell::Num(row.value_eur),
+                opt_num(row.value_growth_pct),
             ]
         })
         .collect();
