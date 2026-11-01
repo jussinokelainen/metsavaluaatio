@@ -165,7 +165,13 @@ pub fn build_species_summary(
             value_eur: 0.0,
         };
 
-        summary.value_growth_pct = calculate_value_growth(&summary);
+        // Yrittää laskea Arvokasvun, käyttää normaalia kasvuprosenttia jos
+        // arvokasvun laskeminen epäonnistuu
+        match calculate_value_growth(&summary) {
+            Some(pct) => summary.value_growth_pct = Some(pct),
+            None => summary.value_growth_pct = growth_pct,
+        }
+
         summary.value_eur = calculate_value(&summary);
         summaries.push(summary);
     }
@@ -247,7 +253,7 @@ fn harvennus(species: Species, sawlog: f64, pulpwood: f64, area: f64) -> f64 {
 }
 
 /// diameter=cm, height=cm, stemcount=runkoa/ha, v_* m³/ha.
-/// Palauttaa 0.028 = 2.8 %.
+/// Palauttaa None jos diameter tai height on None, tai puulaji Muu.
 pub fn tree_net_gain(
     puulaji: Species,
     diameter: Option<f64>,
@@ -257,10 +263,14 @@ pub fn tree_net_gain(
     v_pulpwood: f64,
     v_growth: f64,
     q: Option<f64>,
-) -> f64 {
+) -> Option<f64> {
     // Ennen laskuja tarkistaa funktion ottavat Option parametrit
-    let height = height.unwrap_or(0.0);
-    let Some(diameter) = diameter else { return 0.0 };
+    let Some(height) = height else {
+        return None;
+    };
+    let Some(diameter) = diameter else {
+        return None;
+    };
 
     // Valitsee oikean puulajin Tmax, k, Gtav ja q arvot
     let (tmax, k, gtav, q_default) = match puulaji {
@@ -276,7 +286,7 @@ pub fn tree_net_gain(
             let species = PUULAJIT_VALUEGROWTH.manty;
             (species.tmax, species.k, species.gtav, species.q)
         }
-        Species::Muu => return 0.0,
+        Species::Muu => return None,
     };
 
     // Jos funktion kutsuja antoi q arvon, käyttää sitä
@@ -306,10 +316,11 @@ pub fn tree_net_gain(
     let value0 = 1.0 + (q - 1.0) * t0;
     let value1 = (1.0 + g) * (1.0 + (q - 1.0) * t1);
 
-    value1 / value0 - 1.0
+    Some(value1 / value0 - 1.0)
 }
 
 /// Laskee puulajikohtaisen arvokasvun (€) kuvion tietojen perusteella.
+/// Palauttaa None jos diameter tai height on None, tai puulaji Muu.
 pub fn calculate_value_growth(row: &SpeciesSummary) -> Option<f64> {
     let total_volume = row.volume;
     let sawlog = row.sawlogvolume;
@@ -318,19 +329,19 @@ pub fn calculate_value_growth(row: &SpeciesSummary) -> Option<f64> {
     let sawlog_corr = sawlog_percentage * total_volume;
     let pulpwood_corr = (1.0 - sawlog_percentage) * total_volume;
 
-    Some(
-        100.0
-            * tree_net_gain(
-                row.species,
-                row.meandiameter,
-                row.meanheight,
-                row.stemcount,
-                sawlog_corr,
-                pulpwood_corr,
-                row.volumegrowth,
-                None,
-            ),
-    )
+    match tree_net_gain(
+        row.species,
+        row.meandiameter,
+        row.meanheight,
+        row.stemcount,
+        sawlog_corr,
+        pulpwood_corr,
+        row.volumegrowth,
+        None,
+    ) {
+        Some(net) => Some(100.0 * net),
+        None => None,
+    }
 }
 
 /// Laskee puulajikohtaisen arvon (€) kuvion tietojen perusteella.
