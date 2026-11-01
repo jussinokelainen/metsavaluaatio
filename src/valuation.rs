@@ -550,6 +550,13 @@ pub fn build_fixed_costs(stand_values: &[StandValue]) -> f64 {
     assignments.len() as f64 * (COST_RATES.perusmaksu + COST_RATES.hakkuun_tarkastus)
 }
 
+fn calculate_sawlog_pct(sawlog: Option<f64>, pulp: Option<f64>) -> Option<f64> {
+    let Some(sawlog) = sawlog else { return None };
+    let Some(pulp) = pulp else { return None };
+
+    Some((sawlog / (sawlog + pulp)) * 100.0)
+}
+
 /// Rakentaa raakarivit (df): puuston perustiedot + kuvion tiedot.
 pub fn build_raw_rows(
     strata: &[TreeStratum],
@@ -584,7 +591,7 @@ pub fn build_raw_rows(
             meandiameter: stratum.meandiameter,
             meanheight: stratum.meanheight,
             volume: stratum.volume,
-            sawlogpercent: stratum.sawlogpercent,
+            sawlogpercent: calculate_sawlog_pct(stratum.sawlogvolume, stratum.pulpwoodvolume),
             sawlogvolume: stratum.sawlogvolume,
             pulpwoodvolume: stratum.pulpwoodvolume,
             volumegrowth: stratum.volumegrowth,
