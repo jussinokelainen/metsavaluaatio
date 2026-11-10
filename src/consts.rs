@@ -94,6 +94,59 @@ impl Cutting {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum GrowthPlace {
+    Kalliomaa,
+    KangasKarukko,
+    KangasKuiva,
+    KangasKuivahko,
+    KangasKuivahkoTaiKaru,
+    KangasLehtomainen,
+    KangasTuore,
+    KangasTuoreTaiReheva,
+    Lakimaa,
+    Lehto,
+    Muu,
+}
+
+impl GrowthPlace {
+    pub fn from_opt_code(code: Option<i64>) -> Self {
+        if let Some(c) = code {
+            match c {
+                1 => Self::Lehto,
+                2 => Self::KangasLehtomainen,
+                3 => Self::KangasTuore,
+                4 => Self::KangasKuivahko,
+                5 => Self::KangasKuiva,
+                6 => Self::KangasKarukko,
+                7 => Self::Kalliomaa,
+                8 => Self::Lakimaa,
+                9 => Self::KangasKuivahkoTaiKaru,
+                10 => Self::KangasTuoreTaiReheva,
+                _ => Self::Muu,
+            }
+        } else {
+            Self::Muu
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Kalliomaa => "Kalliomaa ja hietikko",
+            Self::KangasKarukko => "Karukko kangas tai vastaava suo",
+            Self::KangasKuiva => "Kuiva kangas tai vastaava suo",
+            Self::KangasKuivahko => "Kuivahko kangas tai vastaava suo",
+            Self::KangasKuivahkoTaiKaru => "Kuivahko kangas tai sitä karumpi, paperi-ilmoitukset.",
+            Self::KangasLehtomainen => "Lehtomainen kangas tai vastaava suo",
+            Self::KangasTuore => "Tuore kangas tai vastaava suo",
+            Self::KangasTuoreTaiReheva => "Tuore kangas tai sitä rehevämpi, paperi-ilmoitukset.",
+            Self::Lakimaa => "Lakimaa ja tunturi",
+            Self::Lehto => "Lehto tai vastaava suo",
+            Self::Muu => "Muu",
+        }
+    }
+}
+
 struct CuttingPrices {
     uudistus: f64,
     harvennus: f64,

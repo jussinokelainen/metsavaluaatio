@@ -1,5 +1,5 @@
 use crate::consts::{COST_RATES, CYAN, GREEN, LIMITS, RED, RESET, YELLOW};
-use crate::consts::{Cutting, PRICES, PUULAJIT_VALUEGROWTH, Species, TimberType};
+use crate::consts::{Cutting, GrowthPlace, PRICES, PUULAJIT_VALUEGROWTH, Species, TimberType};
 use crate::model::{
     RawRow, SpeciesSummary, Stand, StandSummary, StandValue, TimberValue, Totals, TreeStratum,
 };
@@ -602,7 +602,7 @@ pub fn build_raw_rows(
             standnumber: stand.standnumber,
             cutting: stand.cutting(),
             cuttingproposalyear: stand.cuttingproposalyear,
-            fertility_class: summary.and_then(|s| s.fertility_class),
+            fertility_class: GrowthPlace::from_opt_code(summary.and_then(|s| s.fertility_class)),
             main_group: summary.and_then(|s| s.main_group),
             soil_type: summary.and_then(|s| s.soil_type),
         });
