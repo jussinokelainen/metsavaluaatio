@@ -57,10 +57,10 @@ impl Arguments {
 /// as normal boolean-style flags
 ///
 /// Returns a Result<Arguments> which is an error type if there was invalid flags
-pub fn parse_args(input: Flagset, custom_args: Option<Vec<String>>) -> Result<Arguments> {
+pub fn parse_args(input: Flagset, custom_args: Option<&[&str]>) -> Result<Arguments> {
     let mut only_parse_as_normal = false;
     let input_args = match custom_args {
-        Some(a) => a,
+        Some(a) => a.iter().map(|s| s.to_string()).collect(),
         None => {
             // Get all arguments
             let mut args: Vec<String> = std::env::args().collect();
@@ -232,13 +232,9 @@ mod tests {
         }
     }
 
-    fn args(input: &[&str]) -> Option<Vec<String>> {
-        Some(input.iter().map(|s| s.to_string()).collect())
-    }
-
     #[test]
     fn only_normal_strings() {
-        let parsed = parse_args(cli(), args(&["foobarbaz"])).unwrap();
+        let parsed = parse_args(cli(), Some(&["foobarbaz"])).unwrap();
         assert_eq!(parsed.normal_str, Some(vec!["foobarbaz".to_string()]));
         assert!(parsed.flags.is_none());
         assert!(parsed.value_flags.is_none());
@@ -246,7 +242,7 @@ mod tests {
 
     #[test]
     fn bool_flags() {
-        let long = parse_args(cli(), args(&["--help", "--foo"])).unwrap();
+        let long = parse_args(cli(), Some(&["--help", "--foo"])).unwrap();
         assert!(long.value_flags.is_none());
         assert!(long.normal_str.is_none());
         assert_eq!(
@@ -254,7 +250,7 @@ mod tests {
             Some(Vec::from(["help", "foo"].map(String::from)))
         );
 
-        let short = parse_args(cli(), args(&["-h"])).unwrap();
+        let short = parse_args(cli(), Some(&["-h"])).unwrap();
         assert_eq!(short.flags, Some(vec!["h".to_string()]));
         assert!(short.value_flags.is_none());
         assert!(short.normal_str.is_none());
@@ -262,7 +258,7 @@ mod tests {
 
     #[test]
     fn character_mixed() {
-        let parsed = parse_args(cli(), args(&["-abc", "foo"])).unwrap();
+        let parsed = parse_args(cli(), Some(&["-abc", "foo"])).unwrap();
         assert!(parsed.normal_str.is_none());
         assert_eq!(parsed.flags, Some(vec!["a".to_string(), "b".to_string()]));
         assert_eq!(
@@ -274,7 +270,7 @@ mod tests {
     #[test]
     fn value_flag_with_value_separated() {
         let key = "secret";
-        let parsed = parse_args(cli(), args(&["--bar", key, "--bat", key])).unwrap();
+        let parsed = parse_args(cli(), Some(&["--bar", key, "--bat", key])).unwrap();
         assert_eq!(
             parsed.value_flags,
             Some(vec![
@@ -288,7 +284,7 @@ mod tests {
 
     #[test]
     fn value_flag_with_equal_sign() {
-        let parsed = parse_args(cli(), args(&["--bar=secret"])).unwrap();
+        let parsed = parse_args(cli(), Some(&["--bar=secret"])).unwrap();
         assert_eq!(
             parsed.value_flags,
             Some(vec![("bar".to_string(), "secret".to_string())])
@@ -299,17 +295,17 @@ mod tests {
 
     #[test]
     fn valued_flag_without_value_is_an_error() {
-        assert!(parse_args(cli(), args(&["--bar"])).is_err());
+        assert!(parse_args(cli(), Some(&["--bar"])).is_err());
     }
 
     #[test]
     fn unknown_flag_is_an_error() {
-        assert!(parse_args(cli(), args(&["--nope"])).is_err());
+        assert!(parse_args(cli(), Some(&["--nope"])).is_err());
     }
 
     #[test]
     fn double_dash_stops_flag_parsing() {
-        let parsed = parse_args(cli(), args(&["--", "--help", "--bar"])).unwrap();
+        let parsed = parse_args(cli(), Some(&["--", "--help", "--bar"])).unwrap();
         assert!(parsed.flags.is_none());
         assert!(parsed.value_flags.is_none());
         assert_eq!(
@@ -320,7 +316,7 @@ mod tests {
 
     #[test]
     fn optional_flag_takes_the_next_value_when_present() {
-        let parsed = parse_args(cli(), args(&["--baz", "1"])).unwrap();
+        let parsed = parse_args(cli(), Some(&["--baz", "1"])).unwrap();
         assert!(parsed.flags.is_none());
         assert!(parsed.normal_str.is_none());
         assert_eq!(
@@ -331,7 +327,7 @@ mod tests {
 
     #[test]
     fn optional_flag_works_as_a_boolean_when_last() {
-        let parsed = parse_args(cli(), args(&["--baz"])).unwrap();
+        let parsed = parse_args(cli(), Some(&["--baz"])).unwrap();
         assert!(parsed.normal_str.is_none());
         assert!(parsed.value_flags.is_none());
         assert_eq!(parsed.flags, Some(vec!["baz".to_string()]));
@@ -339,7 +335,7 @@ mod tests {
 
     #[test]
     fn optional_flag_with_equal_sign() {
-        let parsed = parse_args(cli(), args(&["--baz=foo"])).unwrap();
+        let parsed = parse_args(cli(), Some(&["--baz=foo"])).unwrap();
         assert!(parsed.flags.is_none());
         assert!(parsed.normal_str.is_none());
         assert_eq!(
@@ -350,7 +346,7 @@ mod tests {
 
     #[test]
     fn empty_flagset_accepts_any_flag() {
-        let parsed = parse_args(Flagset::new_empty(), args(&["--whatever"])).unwrap();
+        let parsed = parse_args(Flagset::new_empty(), Some(&["--whatever"])).unwrap();
         assert_eq!(parsed.flags, Some(vec!["whatever".to_string()]));
     }
 
@@ -358,7 +354,7 @@ mod tests {
     fn everything_mixed() {
         let parsed = parse_args(
             cli(),
-            args(&["-abc=foo", "--foo", "--bar", "asdf", "--baz", "-h", "hello"]),
+            Some(&["-abc=foo", "--foo", "--bar", "asdf", "--baz", "-h", "hello"]),
         )
         .unwrap();
         assert_eq!(

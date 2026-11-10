@@ -200,7 +200,7 @@ fn clip_stand_geometry(
 
 /// Luo kml tiedoston jonka voi importata google mapsiin tasoksi
 pub fn write_kml(
-    features: Vec<Feature>,
+    features: &[Feature],
     property: &MultiPolygon<f64>,
     file_path: &PathBuf,
     stand_values: &Vec<StandValue>,
@@ -216,7 +216,7 @@ pub fn write_kml(
     kml.push_str(&add_property_outline(&geo_utils::transform(
         property, &to_wgs84,
     )));
-    for feature in &features {
+    for feature in features {
         let Some(geometry) = clip_stand_geometry(feature, property) else {
             continue;
         };

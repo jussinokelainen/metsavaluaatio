@@ -48,11 +48,11 @@ fn main() -> Result<()> {
         for (flag, value) in value_flags {
             match flag.as_str() {
                 "aseta-api" => {
-                    set_api(value)?;
+                    set_api(&value)?;
                     return Ok(());
                 }
                 "poista-kunta" => {
-                    remove_municipality(value);
+                    remove_municipality(&value);
                     return Ok(());
                 }
                 "gpkg-kohde" => {
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
     println!("Kunta: {CYAN}{municipality_name}{RESET}");
 
     let (property_geometry, prop_feature_count) =
-        get_property_geometry(property_id, config.api_key)?;
+        get_property_geometry(property_id, &config.api_key)?;
     println!("Kiinteistöltä löytyi {prop_feature_count} palstaa.");
 
     println!(
@@ -177,7 +177,12 @@ fn main() -> Result<()> {
         Some(dir) => dir.join(generate_filename(property_id, ".kml")),
         None => PathBuf::from(generate_filename(property_id, ".kml")),
     };
-    metsaval::maps::write_kml(stand_features, &property_geometry, &kml_file, &stand_values)?;
+    metsaval::maps::write_kml(
+        &stand_features,
+        &property_geometry,
+        &kml_file,
+        &stand_values,
+    )?;
     // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
     // jos se ei onnistu
     match std::fs::canonicalize(&kml_file) {
@@ -235,7 +240,7 @@ fn main() -> Result<()> {
 }
 
 /// Lisää kiinteistötunnukseen puuttuvat nollat jotta pituus on oikea
-fn pad_property_id(id: &String) -> Result<String> {
+fn pad_property_id(id: &str) -> Result<String> {
     let parts: Vec<&str> = id.split('-').collect();
     if parts.len() != 4 {
         return Err(eyre!("Virheellinen kiinteistötunnus"));
@@ -321,7 +326,7 @@ fn ask_file_creation() -> bool {
 
 /// Palauttaa kiinteistön geometrian yhdistettynä yhteen MultiPolygoniin, ja kiinteistöllä sijaitsevien
 /// palstojen määrän
-fn get_property_geometry(property_id: &String, api_key: String) -> Result<(MultiPolygon, usize)> {
+fn get_property_geometry(property_id: &str, api_key: &str) -> Result<(MultiPolygon, usize)> {
     // Kiinteistön palstat MML:stä
     let property_features = metsaval::mml::get_property_features(property_id, &api_key)?;
 
@@ -373,7 +378,7 @@ fn load_config() -> Result<Config> {
 }
 
 /// Tallentaa annetun avaimen ohjelman config.toml tiedostoon
-fn set_api(key: String) -> Result<()> {
+fn set_api(key: &str) -> Result<()> {
     if let Some(config_file) = config_file_path() {
         let api_string = format!("api_key = \"{key}\"");
         fs::write(&config_file, api_string)?;
@@ -390,7 +395,7 @@ fn set_api(key: String) -> Result<()> {
 }
 
 /// Generoi ohjelman tuottamille tiedostoille nimen
-fn generate_filename(property_id: &String, suffix: &str) -> String {
+fn generate_filename(property_id: &str, suffix: &str) -> String {
     let mut time = Local::now().trunc_subsecs(0).to_rfc3339().replace(":", "-");
 
     // Poistaa ajasta kellonajan ja aikavyöhykkeen (esim 'T08-00-00 +0300')
@@ -398,7 +403,7 @@ fn generate_filename(property_id: &String, suffix: &str) -> String {
         time.truncate(pos);
     }
 
-    let mut filename = property_id.clone();
+    let mut filename = property_id.to_owned();
     filename.push_str("__");
     filename.push_str(&time);
     filename.push_str(suffix);
@@ -406,9 +411,9 @@ fn generate_filename(property_id: &String, suffix: &str) -> String {
     filename
 }
 
-fn parse_municipality(property_id: &String) -> Result<String> {
+fn parse_municipality(property_id: &str) -> Result<String> {
     let mut municipalities = load_municipalities();
-    let mut municip_id = property_id.clone();
+    let mut municip_id = property_id.to_owned();
     let Some(pos) = municip_id.find('-') else {
         return Err(eyre!("Virheellinen kiinteistötunnus"));
     };
@@ -485,9 +490,9 @@ fn ask_municipality() -> String {
     s
 }
 
-fn remove_municipality(key: String) {
+fn remove_municipality(key: &str) {
     let mut municipalities = load_municipalities();
-    municipalities.remove(&key);
+    municipalities.remove(key);
     save_municipalities(municipalities);
     println!("Kunta {YELLOW}{key}{RESET} poistettu");
 }
