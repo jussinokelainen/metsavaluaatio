@@ -160,10 +160,11 @@ fn main() -> Result<()> {
         metsaval::valuation::build_stand_values(&species_summary, &stand_summaries, &stands);
     let raw_rows = metsaval::valuation::build_raw_rows(&strata, &stands, &stand_summaries)?;
     let fixed_costs = metsaval::valuation::build_fixed_costs(&stand_values);
+    let totals = metsaval::valuation::compute_totals(&stands, &stand_values);
 
     // Tulostus
     let summary_str =
-        metsaval::valuation::create_dataset_summary(&stands, &stand_values, &fixed_costs);
+        metsaval::valuation::create_dataset_summary(&stand_values, &fixed_costs, &totals);
     println!("{summary_str}");
 
     // Kysy käyttäjältä luodaanko tiedostot
@@ -193,7 +194,6 @@ fn main() -> Result<()> {
     }
 
     // Excel-yhteenveto
-    let totals = metsaval::valuation::compute_totals(&stands, &stand_values);
     let excel_file = match &output_file_dir {
         Some(dir) => dir.join(generate_filename(property_id, ".xlsx")),
         None => PathBuf::from(generate_filename(property_id, ".xlsx")),

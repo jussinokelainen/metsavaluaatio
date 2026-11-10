@@ -672,9 +672,9 @@ fn grouped(value: f64) -> String {
 
 /// Tulostaa koko aineiston yhteenvedon.
 pub fn create_dataset_summary(
-    stands: &[Stand],
     stand_values: &[StandValue],
     fixed_costs: &f64,
+    totals: &Totals,
 ) -> String {
     let mut summary = String::new();
     summary.push_str(&format!("\n"));
@@ -684,11 +684,6 @@ pub fn create_dataset_summary(
 {CYAN}Yhteenveto{RESET}
 {CYAN}----------{RESET}"
     ));
-
-    let area: f64 = sum(stands.iter().filter_map(|stand| stand.area));
-    let volume: f64 = sum(stand_values.iter().map(|row| row.volume));
-    let sawlog: f64 = sum(stand_values.iter().map(|row| row.sawlogvolume));
-    let pulpwood: f64 = sum(stand_values.iter().map(|row| row.pulpwoodvolume));
 
     let value = sum(stand_values.iter().map(|s| s.net_eur)) - fixed_costs;
     summary.push_str(&format!(
@@ -701,10 +696,10 @@ Tulot: {CYAN}{:.2} €{RESET}
 Muuttuvat kulut: {YELLOW}{:.2} €{RESET}
 Kiinteät kulut: {YELLOW}{fixed_costs:.2} €{RESET}
 LASKENNALLINEN ARVO: {}{} €{RESET}\n",
-        grouped_precise(area, 2),
-        grouped_precise(volume, 2),
-        grouped_precise(sawlog, 2),
-        grouped_precise(pulpwood, 2),
+        grouped_precise(totals.area_ha, 2),
+        grouped_precise(totals.volume_m3, 2),
+        grouped_precise(totals.sawlog_m3, 2),
+        grouped_precise(totals.pulpwood_m3, 2),
         sum(stand_values.iter().map(|s| s.income_eur)),
         sum(stand_values.iter().map(|s| s.costs_eur)),
         if value > 0.0 { GREEN } else { RED },
