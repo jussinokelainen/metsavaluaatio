@@ -231,7 +231,7 @@ impl MainGroup {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum GrowthPlace {
+pub enum FertilityClass {
     Kalliomaa,
     KangasKarukko,
     KangasKuiva,
@@ -245,7 +245,7 @@ pub enum GrowthPlace {
     Muu,
 }
 
-impl GrowthPlace {
+impl FertilityClass {
     pub fn from_opt_code(code: Option<i64>) -> Self {
         if let Some(c) = code {
             match c {

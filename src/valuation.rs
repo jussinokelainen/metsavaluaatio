@@ -1,6 +1,6 @@
 use crate::consts::{COST_RATES, CYAN, GREEN, LIMITS, RED, RESET, YELLOW};
 use crate::consts::{Cutting, PRICES, PUULAJIT_VALUEGROWTH, Species, TimberType};
-use crate::consts::{GrowthPlace, MainGroup, SoilType};
+use crate::consts::{FertilityClass, MainGroup, SoilType};
 use crate::model::{
     RawRow, SpeciesSummary, Stand, StandSummary, StandValue, TimberValue, Totals, TreeStratum,
 };
@@ -523,9 +523,11 @@ pub fn build_stand_values(
             area,
             growth_pct,
             main_species: summary.and_then(|summary| summary.main_species),
-            fertility_class: summary.and_then(|summary| summary.fertility_class),
-            main_group: summary.and_then(|summary| summary.main_group),
-            soil_type: summary.and_then(|summary| summary.soil_type),
+            fertility_class: FertilityClass::from_opt_code(
+                summary.and_then(|summary| summary.fertility_class),
+            ),
+            main_group: MainGroup::from_opt_code(summary.and_then(|summary| summary.main_group)),
+            soil_type: SoilType::from_opt_code(summary.and_then(|summary| summary.soil_type)),
             income_eur: value_eur,
             costs_eur,
             net_eur: value_eur - costs_eur,
@@ -603,7 +605,7 @@ pub fn build_raw_rows(
             standnumber: stand.standnumber,
             cutting: stand.cutting(),
             cuttingproposalyear: stand.cuttingproposalyear,
-            fertility_class: GrowthPlace::from_opt_code(summary.and_then(|s| s.fertility_class)),
+            fertility_class: FertilityClass::from_opt_code(summary.and_then(|s| s.fertility_class)),
             main_group: MainGroup::from_opt_code(summary.and_then(|s| s.main_group)),
             soil_type: SoilType::from_opt_code(summary.and_then(|s| s.soil_type)),
         });

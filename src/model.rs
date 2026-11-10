@@ -1,4 +1,4 @@
-use crate::consts::{Cutting, GrowthPlace, MainGroup, SoilType, Species, TimberType};
+use crate::consts::{Cutting, FertilityClass, MainGroup, SoilType, Species, TimberType};
 
 /// Kiinteistöön leikattu metsäkuvio (Metsäkeskuksen WFS:stä).
 #[derive(Clone, Debug, Default)]
@@ -112,9 +112,9 @@ pub struct StandValue {
     pub area: Option<f64>,
     pub growth_pct: Option<f64>,
     pub main_species: Option<i64>,
-    pub fertility_class: Option<i64>,
-    pub main_group: Option<i64>,
-    pub soil_type: Option<i64>,
+    pub fertility_class: FertilityClass,
+    pub main_group: MainGroup,
+    pub soil_type: SoilType,
     pub income_eur: f64,
     pub costs_eur: f64,
     pub net_eur: f64,
@@ -143,7 +143,7 @@ pub struct RawRow {
     pub standnumber: Option<i64>,
     pub cutting: Option<Cutting>,
     pub cuttingproposalyear: Option<i64>,
-    pub fertility_class: GrowthPlace,
+    pub fertility_class: FertilityClass,
     pub main_group: MainGroup,
     pub soil_type: SoilType,
 }
