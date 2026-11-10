@@ -29,7 +29,7 @@ cd metsavaluaatio
 cargo install --path .
 ```
 
-Muista lisätä `~/.cargo/bin` `$PATH` muuttujaan asentaessa cargolla esim:
+Muista lisätä `~/.cargo/bin` `$PATH` muuttujaan asentaessa cargolla esim `~/.bashrc` tiedostoon lisäämällä
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -52,6 +52,8 @@ johon lisätään kenttä `api-key = "<api-key>"`, tai komennolla
 metsaval --aseta-api <api-key>
 ```
 
+Api avain täytyy lisätä vain kerran, tai uudestaan jos se muuttuu.
+
 Api-avaimen lisäämisen jälkeen ohjelman käyttö:
 
 ```bash
@@ -59,8 +61,10 @@ metsaval 12-345-6-789
 ```
 
 Ohjelma vaatii parametrina kiinteistötunnuksen kuten yllä olevassa esimerkissä.
-Tämä tuottaa .xlsx ja .kml tiedostot siihen hakemistoon jossa se ajetaan, ja
-avaa selaimen osoitteessa jossa .kml tiedostosta voi tehdä karttatason.
+Tämä näyttää lyhyen yhteenvedon kiinteistöstä, ja halutessaan luo
+.xlsx ja .kml tiedostot käyttäjän Downloads hakemistoon. `--selain` flagia käyttäessä
+ohjelma avaa automaattisesti selaimeen uuden välilehden oikeassa osoitteessa, muuten
+antaa linkin osoitteen avaamiseen.
 
 #### Hyödyllisiä flageja
 ```bash
@@ -79,7 +83,7 @@ kiinteistön olevan samassa kunnassa kuin aikaisemmin haetun kiinteistön GeoPac
 metsaval 12-345-6-789 --gpkg-tiedosto /tmp/metsavaluaatio_123456/MV_Kunta.gpkg
 ```
 
-HUOM! Tällä hetkellä ei ole mitään takuita mitä tapahtuu jos antaa virheellistä dataa näillä flageilla!
+HUOM! Tällä hetkellä ei ole mitään takuuta mitä tapahtuu jos antaa virheellistä dataa näillä flageilla!
 
 ##### Lisätietoja muista ominaisuuksista:
 
