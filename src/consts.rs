@@ -95,6 +95,107 @@ impl Cutting {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub enum SoilType {
+    Keskikarkea,
+    KarkeaMoreeni,
+    KarkeaLajittunut,
+    HienojakoinenKangasmaa,
+    HienojakoinenMoreeni,
+    HienojakoinenLajittunut,
+    Silttipitoinen,
+    Savimaa,
+    KivinenKeskikarkeaKangas,
+    KivinenKarkeaMoreeni,
+    KivinenKarkeaLajittunut,
+    KivinenHieno,
+    Turvemaa,
+    SaraTurve,
+    RahkaTurve,
+    PuuvaltainenTurve,
+    EroosioherkkäSara,
+    EroosioherkkäRahka,
+    MaatumatonSara,
+    MaatumatonRahka,
+    MustikkaKangasI,
+    MustikkaKangasII,
+    PuolukkaKangasI,
+    PuolukkaKangasII,
+    RuohoTurveKangas,
+    VarpuTurveKangas,
+    Muu,
+}
+
+impl SoilType {
+    pub fn from_opt_code(code: Option<i64>) -> Self {
+        if let Some(c) = code {
+            match c {
+                10 => Self::Keskikarkea,
+                11 => Self::KarkeaMoreeni,
+                12 => Self::KarkeaLajittunut,
+                20 => Self::HienojakoinenKangasmaa,
+                21 => Self::HienojakoinenMoreeni,
+                22 => Self::HienojakoinenLajittunut,
+                23 => Self::Silttipitoinen,
+                24 => Self::Savimaa,
+                30 => Self::KivinenKeskikarkeaKangas,
+                31 => Self::KivinenKarkeaMoreeni,
+                32 => Self::KivinenKarkeaLajittunut,
+                40 => Self::KivinenHieno,
+                60 => Self::Turvemaa,
+                61 => Self::SaraTurve,
+                62 => Self::RahkaTurve,
+                63 => Self::PuuvaltainenTurve,
+                64 => Self::EroosioherkkäSara,
+                65 => Self::EroosioherkkäRahka,
+                66 => Self::MaatumatonSara,
+                67 => Self::MaatumatonRahka,
+                791 => Self::MustikkaKangasI,
+                792 => Self::MustikkaKangasII,
+                793 => Self::PuolukkaKangasI,
+                794 => Self::PuolukkaKangasII,
+                795 => Self::RuohoTurveKangas,
+                796 => Self::VarpuTurveKangas,
+                _ => Self::Muu,
+            }
+        } else {
+            Self::Muu
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Keskikarkea => "Keskikarkea tai karkea kangasmaa",
+            Self::KarkeaMoreeni => "Karkea moreeni",
+            Self::KarkeaLajittunut => "Karkea lajittunut maalaji",
+            Self::HienojakoinenKangasmaa => "Hienojakoinen kangasmaa",
+            Self::HienojakoinenMoreeni => "Hienojakoinen moreeni",
+            Self::HienojakoinenLajittunut => "Hienojakoinen lajittunut maalaji",
+            Self::Silttipitoinen => "Silttipitoinen maalaji",
+            Self::Savimaa => "Savimaa",
+            Self::KivinenKeskikarkeaKangas => "Kivinen Keskikarkea tai karkea kangasmaa",
+            Self::KivinenKarkeaMoreeni => "Kivinen karkea moreeni",
+            Self::KivinenKarkeaLajittunut => "Kivinen karkea lajittunut maalaji",
+            Self::KivinenHieno => "Kivinen hienojakoinen kangasmaa",
+            Self::Turvemaa => "Turvemaa",
+            Self::SaraTurve => "Saraturve",
+            Self::RahkaTurve => "Rahkaturve",
+            Self::PuuvaltainenTurve => "Puuvaltainen turve",
+            Self::EroosioherkkäSara => "Eroosioherkkä saraturve (von Post luokka yli 5)",
+            Self::EroosioherkkäRahka => "Eroosioherkkä rahkaturve (von Post luokka yli 5)",
+            Self::MaatumatonSara => "Maatumaton saraturve (von Post luokka enintään 5)",
+            Self::MaatumatonRahka => "Maatumaton rahkaturve (von Post enintään 5)",
+            Self::MustikkaKangasI => "Mustikkaturvekangas (I)",
+            Self::MustikkaKangasII => "Mustikkaturvekangas (II)",
+            Self::PuolukkaKangasI => "Puolukkaturvekangas (I)",
+            Self::PuolukkaKangasII => "Puolukkaturvekangas (II)",
+            Self::RuohoTurveKangas => "Ruohoturvekangas",
+            Self::VarpuTurveKangas => "Varputurvekangas",
+            Self::Muu => "Muu",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum MainGroup {
     MetsaMaa,
     KituMaa,

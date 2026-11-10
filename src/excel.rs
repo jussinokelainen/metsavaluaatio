@@ -362,7 +362,7 @@ fn raw_sheet(raw_rows: &[RawRow]) -> Sheet {
                 opt_int(row.cuttingproposalyear),
                 text(row.fertility_class.name()),
                 text(row.main_group.name()),
-                opt_int(row.soil_type),
+                text(row.soil_type.name()),
             ]
         })
         .collect();
