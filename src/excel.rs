@@ -361,7 +361,7 @@ fn raw_sheet(raw_rows: &[RawRow]) -> Sheet {
                 cutting_text(row.cutting),
                 opt_int(row.cuttingproposalyear),
                 text(row.fertility_class.name()),
-                opt_int(row.main_group),
+                text(row.main_group.name()),
                 opt_int(row.soil_type),
             ]
         })

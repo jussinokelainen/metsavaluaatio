@@ -95,6 +95,41 @@ impl Cutting {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub enum MainGroup {
+    MetsaMaa,
+    KituMaa,
+    Joutomaa,
+    MuuMetsaTalous,
+    Muu,
+}
+
+impl MainGroup {
+    pub fn from_opt_code(code: Option<i64>) -> Self {
+        if let Some(c) = code {
+            match c {
+                1 => Self::MetsaMaa,
+                2 => Self::KituMaa,
+                3 => Self::Joutomaa,
+                4 => Self::MuuMetsaTalous,
+                _ => Self::Muu,
+            }
+        } else {
+            Self::Muu
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::MetsaMaa => "Metsämaa",
+            Self::KituMaa => "Kitumaa",
+            Self::Joutomaa => "Joutomaa",
+            Self::MuuMetsaTalous => "Muu metsätalousmaa",
+            Self::Muu => "Muu",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum GrowthPlace {
     Kalliomaa,
     KangasKarukko,
