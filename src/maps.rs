@@ -199,12 +199,11 @@ fn clip_stand_geometry(
 }
 
 /// Luo kml tiedoston jonka voi importata google mapsiin tasoksi
-pub fn write_kml(
+pub fn generate_kml(
     features: &[Feature],
     property: &MultiPolygon<f64>,
-    file_path: &PathBuf,
     stand_values: &Vec<StandValue>,
-) -> Result<()> {
+) -> Result<String> {
     let mut kml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
@@ -248,7 +247,12 @@ pub fn write_kml(
 </kml>",
     );
 
-    std::fs::write(&file_path, kml)?;
+    Ok(kml)
+}
+
+pub fn write_kml(kml_data: &str, file_path: &PathBuf) -> Result<()> {
+    std::fs::write(&file_path, kml_data)?;
+
     Ok(())
 }
 

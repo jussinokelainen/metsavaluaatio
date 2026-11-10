@@ -177,12 +177,9 @@ fn main() -> Result<()> {
         Some(dir) => dir.join(generate_filename(property_id, ".kml")),
         None => PathBuf::from(generate_filename(property_id, ".kml")),
     };
-    metsaval::maps::write_kml(
-        &stand_features,
-        &property_geometry,
-        &kml_file,
-        &stand_values,
-    )?;
+    let kml_data =
+        metsaval::maps::generate_kml(&stand_features, &property_geometry, &stand_values)?;
+    metsaval::maps::write_kml(&kml_data, &kml_file)?;
     // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
     // jos se ei onnistu
     match std::fs::canonicalize(&kml_file) {
