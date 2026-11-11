@@ -11,16 +11,27 @@ use metsaval::{excel, geo_utils, maps, valuation};
 use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 // ---------------------------------------------------------------------------
 // Apu
 // ---------------------------------------------------------------------------
 
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
 struct TempDir(PathBuf);
 
 impl TempDir {
-    fn new() -> Self {
-        let path = std::env::temp_dir().join(format!("metsaval_pipeline_{}", std::process::id()));
+    /// Luo yksilöidyn hakemiston, jotta rinnakkain ajettavat testit eivät
+    /// kirjoita samoihin tiedostoihin.
+    fn new(label: &str) -> Self {
+        let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "metsaval_pipeline_{}_{}_{}",
+            label,
+            std::process::id(),
+            counter
+        ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
         Self(path)
@@ -139,7 +150,7 @@ fn read_entry(path: &Path, name: &str) -> String {
 
 #[test]
 fn full_pipeline_from_property_to_exports() {
-    let dir = TempDir::new();
+    let dir = TempDir::new("full");
 
     // 1. Kiinteistön palstat leikataan yhdeksi geometriaksi
     let property_geometry = property();
@@ -323,4 +334,38 @@ fn property_without_stands_produces_no_stand_rows() {
     assert_eq!(totals.stand_count, 0);
     assert_eq!(totals.area_ha, 0.0);
     assert_close(totals.net_eur, 0.0);
+}
+
+/// KML- ja Excel-tiedosto kirjoitetaan rinnakkain `join!`:lla. Molempien
+/// tehtävien työ on synkronista, joten ne ajetaan `spawn_blocking`-
+/// taustasäikeissä eivätkä ne blokkaa toisiaan.
+#[tokio::test]
+async fn kml_and_excel_are_written_concurrently() {
+    let dir = TempDir::new("concurrent");
+    let kml_path = dir.file("rinnakkain.kml");
+    let excel_path = dir.file("rinnakkain.xlsx");
+
+    let totals = valuation::compute_totals(&[], &[]);
+
+    let (kml_result, excel_result) = tokio::join!(
+        maps::generate_and_write_kml(vec![], property(), vec![], kml_path.clone()),
+        excel::export_async(
+            excel_path.clone(),
+            totals,
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            0.0,
+        ),
+    );
+
+    kml_result.unwrap();
+    excel_result.unwrap();
+
+    let kml = fs::read_to_string(&kml_path).unwrap();
+    assert!(kml.contains("<name>Kiinteistön rajat</name>"));
+
+    let workbook = read_entry(&excel_path, "xl/workbook.xml");
+    assert!(workbook.contains("name=\"Yhteenveto\""));
 }

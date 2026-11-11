@@ -9,15 +9,16 @@ use std::path::{Path, PathBuf};
 
 /// Hakee kunnan metsävarakuviot Metsäkeskuksesta ja purkaa GeoPackagen
 /// väliaikaistiedostoon.
-pub fn download_gpkg(municipality_name: &str, dest_dir: PathBuf) -> Result<PathBuf> {
+pub async fn download_gpkg(municipality_name: &str, dest_dir: PathBuf) -> Result<PathBuf> {
     let url = format!("{MUNICIPALITY_ZIP_BASE}{municipality_name}.zip");
-    download_gpkg_from(&url, dest_dir)
+    download_gpkg_from(&url, dest_dir).await
 }
 
 /// Hakee ZIP-arkiston annetusta osoitteesta ja purkaa siitä GeoPackagen.
-fn download_gpkg_from(url: &str, dest_dir: PathBuf) -> Result<PathBuf> {
-    let bytes = http::get_bytes(url, &[], 300)?;
-    extract_gpkg(&bytes, &dest_dir)
+async fn download_gpkg_from(url: &str, dest_dir: PathBuf) -> Result<PathBuf> {
+    let bytes = http::get_bytes(url, &[], 300).await?;
+    // Purku kirjoittaa levylle, joten se ajetaan taustasäikeessä
+    tokio::task::spawn_blocking(move || extract_gpkg(&bytes, &dest_dir)).await?
 }
 
 /// Purkaa ZIP-arkistosta ensimmäisen GeoPackagen (`*.gpkg`) annettuun
@@ -62,6 +63,15 @@ fn placeholders(count: usize) -> String {
     std::iter::repeat_n("?", count)
         .collect::<Vec<_>>()
         .join(",")
+}
+
+/// Asynkroninen `read_trees`. SQLite-luku on synkronista, joten se ajetaan
+/// taustasäikeessä eikä se blokkaa asynkronista runtimea.
+pub async fn read_trees_async(
+    gpkg_path: PathBuf,
+    stand_ids: Vec<i64>,
+) -> Result<(Vec<TreeStratum>, Vec<StandSummary>)> {
+    tokio::task::spawn_blocking(move || read_trees(&gpkg_path, &stand_ids)).await?
 }
 
 /// Hakee kuvioiden nykyisen puuston ja koko kuvion yhteenvedot GeoPackagesta.
@@ -261,14 +271,14 @@ mod tests {
         assert!(extract_gpkg("tämä ei ole zipiä".as_bytes(), dir.path()).is_err());
     }
 
-    #[test]
-    fn download_gpkg_from_fetches_and_extracts_the_archive() {
+    #[tokio::test]
+    async fn download_gpkg_from_fetches_and_extracts_the_archive() {
         let dir = TempDir::new("download_gpkg");
         let bytes = build_zip(&[("MV_Testi.gpkg", b"verkkosisalto")]);
         let (url, log) = serve_bytes("200 OK", "application/zip", &bytes);
 
         let dest = dir.file("purettu");
-        let path = download_gpkg_from(&url, dest.clone()).unwrap();
+        let path = download_gpkg_from(&url, dest.clone()).await.unwrap();
 
         assert_eq!(path, dest.join("MV_Testi.gpkg"));
         assert_eq!(std::fs::read(&path).unwrap(), b"verkkosisalto");
@@ -280,11 +290,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn download_gpkg_from_reports_http_errors() {
+    #[tokio::test]
+    async fn download_gpkg_from_reports_http_errors() {
         let dir = TempDir::new("download_gpkg_err");
         let (url, _log) = serve_bytes("404 Not Found", "text/plain", "ei ole täällä".as_bytes());
-        assert!(download_gpkg_from(&url, dir.path().to_path_buf()).is_err());
+        assert!(
+            download_gpkg_from(&url, dir.path().to_path_buf())
+                .await
+                .is_err()
+        );
     }
 
     /// Luo GeoPackagen kaltaisen SQLite-tiedoston ohjelman lukeman skeeman mukaan.

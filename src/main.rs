@@ -20,7 +20,10 @@ struct Config {
     api_key: String,
 }
 
-fn main() -> Result<()> {
+/// `#[tokio::main]` luo monisäikeisen runtimea ja ajaa `main`:in sen
+/// sisällä. Tämän ansiosta `main` voi kutsua `await`-lausekkeita.
+#[tokio::main]
+async fn main() -> Result<()> {
     color_eyre::install()?;
 
     let args = flagger::parse_args(cli_flags(), None)?;
@@ -43,7 +46,7 @@ fn main() -> Result<()> {
             print_usage();
             std::process::exit(2);
         }
-        Command::Run(options) => run(options),
+        Command::Run(options) => run(options).await,
     }
 }
 
@@ -121,7 +124,11 @@ fn parse_options(args: flagger::Arguments) -> Command {
 }
 
 /// Kiinteistön tietojen haku, laskenta ja tiedostojen luonti.
-fn run(options: RunOptions) -> Result<()> {
+///
+/// Verkkohaku on asynkronista (`reqwest` + `await`) ja tiedostojen kirjoitus
+/// ajetaan rinnakkain funktion lopussa. GeoPackage-purku, SQLite-luku ja
+/// käyttäjän syöte ovat yhä synkronisia ja blokkaavat runtimen säikeen.
+async fn run(options: RunOptions) -> Result<()> {
     let output_file_dir = dirs::download_dir();
 
     let property_id = &pad_property_id(&options.property_id)?;
@@ -131,8 +138,35 @@ fn run(options: RunOptions) -> Result<()> {
     println!("Kiinteistötunnus: {CYAN}{property_id}{RESET}");
     println!("Kunta: {CYAN}{municipality_name}{RESET}");
 
+    // GeoPackage ei tarvitse kiinteistön tai kuvioiden tietoja, joten sen
+    // lataus alkaa heti kun kunta tiedetään ja etenee taustalla muun haun
+    // ajan. Tuloksen odotus tapahtuu vasta puustotietoja haettaessa.
+    let gpkg_task = if options.gpkg_path.is_empty() {
+        let mut gpkg_download_dir = options.gpkg_download_dir;
+        if gpkg_download_dir.is_empty() {
+            gpkg_download_dir =
+                std::env::temp_dir().join(format!("metsavaluaatio_{}", std::process::id()));
+        }
+
+        println!("Haetaan GeoPackage kunnalle {municipality_name}...");
+        let municipality = municipality_name.clone();
+        Some(tokio::spawn(async move {
+            let start_t = Local::now().timestamp_millis();
+            let path =
+                metsaval::metsakeskus::download_gpkg(&municipality, gpkg_download_dir).await?;
+            let total_t = (Local::now().timestamp_millis() - start_t) as f64 / 1000.0;
+            println!(
+                "{GREEN}GeoPackage valmis{RESET} ({total_t:.1} s): {}",
+                path.display()
+            );
+            Ok::<PathBuf, color_eyre::Report>(path)
+        }))
+    } else {
+        None
+    };
+
     let (property_geometry, prop_feature_count) =
-        get_property_geometry(property_id, &config.api_key)?;
+        get_property_geometry(property_id, &config.api_key).await?;
     println!("Kiinteistöltä löytyi {prop_feature_count} palstaa.");
 
     println!(
@@ -145,7 +179,7 @@ fn run(options: RunOptions) -> Result<()> {
     );
 
     // Metsävarakuviot Metsäkeskuksen WFS:stä
-    let stand_layers = metsaval::wfs::get_layers(SMK_STAND_WFS)?;
+    let stand_layers = metsaval::wfs::get_layers(SMK_STAND_WFS).await?;
     println!("Metsävarakerroksia löytyi: {}", stand_layers.len());
 
     let stand_layer = metsaval::wfs::select_stand_layer(&stand_layers)?;
@@ -159,7 +193,8 @@ fn run(options: RunOptions) -> Result<()> {
     println!("{bbox}");
 
     let stand_features =
-        metsaval::wfs::get_features_bbox(SMK_STAND_WFS, &stand_layer, &bbox, EPSG_TM35FIN, 10_000)?;
+        metsaval::wfs::get_features_bbox(SMK_STAND_WFS, &stand_layer, &bbox, EPSG_TM35FIN, 10_000)
+            .await?;
     println!("BBOX-alueelta löytyi: {} kuviota", stand_features.len());
 
     let stands: Vec<Stand> = stand_features
@@ -176,27 +211,17 @@ fn run(options: RunOptions) -> Result<()> {
         color_eyre::eyre::bail!("Kiinteistöltä ei löytynyt yhtään metsäkuviota.");
     }
 
-    // Puustotiedot Metsäkeskuksen GeoPackagesta
-    let mut gpkg_download_dir = options.gpkg_download_dir;
-    let mut gpkg_path = options.gpkg_path;
-    if gpkg_path.is_empty() {
-        let gpkg_start_t = Local::now().timestamp_millis();
-        println!("Haetaan GeoPackage kunnalle {municipality_name}...");
-        if gpkg_download_dir.is_empty() {
-            gpkg_download_dir =
-                std::env::temp_dir().join(format!("metsavaluaatio_{}", std::process::id()));
-        }
-        gpkg_path = metsaval::metsakeskus::download_gpkg(municipality_name, gpkg_download_dir)?;
-        let gpkg_total_t = (Local::now().timestamp_millis() - gpkg_start_t) as f64 / 1000.0;
-        println!(
-            "{GREEN}GeoPackage valmis{RESET} ({gpkg_total_t:.1} s): {}",
-            gpkg_path.display()
-        );
-    }
-
     let stand_ids = collect_stand_ids(&stands)?;
 
-    let (strata, stand_summaries) = metsaval::metsakeskus::read_trees(&gpkg_path, &stand_ids)?;
+    // Puustotiedot Metsäkeskuksen GeoPackagesta. Ladattu tiedosto odotetaan
+    // vasta tässä, kun sitä tarvitaan.
+    let gpkg_path = match gpkg_task {
+        Some(task) => task.await??,
+        None => options.gpkg_path,
+    };
+
+    let (strata, stand_summaries) =
+        metsaval::metsakeskus::read_trees_async(gpkg_path, stand_ids).await?;
 
     // Arvon laskenta
     let species_summary = metsaval::valuation::build_species_summary(&strata, &stands)?;
@@ -218,17 +243,44 @@ fn run(options: RunOptions) -> Result<()> {
         return Ok(());
     }
 
-    // Maps tason luonti
+    // Tiedostot luodaan rinnakkain. Kummankin tehtävän työ on synkronista
+    // (KML:n kokoaminen ja tiedoston kirjoitus, Excel-työkirjan rakentaminen),
+    // joten ne ajetaan omassa taustasäikeessään `spawn_blocking`-kautta eivätkä
+    // ne blokkaa asynkronista runtimea.
     let kml_file = match &output_file_dir {
         Some(dir) => dir.join(generate_filename(property_id, ".kml")),
         None => PathBuf::from(generate_filename(property_id, ".kml")),
     };
-    let kml_data =
-        metsaval::maps::generate_kml(&stand_features, &property_geometry, &stand_values)?;
-    metsaval::maps::write_kml(&kml_data, &kml_file)?;
+    let excel_file = match &output_file_dir {
+        Some(dir) => dir.join(generate_filename(property_id, ".xlsx")),
+        None => PathBuf::from(generate_filename(property_id, ".xlsx")),
+    };
+
+    // `join!` odottaa molempia tehtäviä rinnakkain ja palauttaa molemmat
+    // tulokset vasta, kun molemmat ovat valmiita. `stand_values` on
+    // molempien tehtävien tarpeessa, joten siitä otetaan kopio.
+    let (kml_result, excel_result) = tokio::join!(
+        metsaval::maps::generate_and_write_kml(
+            stand_features,
+            property_geometry,
+            stand_values.clone(),
+            kml_file,
+        ),
+        metsaval::excel::export_async(
+            excel_file,
+            totals,
+            stand_values,
+            species_summary,
+            timber_values,
+            raw_rows,
+            fixed_costs,
+        ),
+    );
+
+    let kml_path = kml_result?;
     // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
     // jos se ei onnistu
-    match std::fs::canonicalize(&kml_file) {
+    match std::fs::canonicalize(&kml_path) {
         Ok(path) => {
             println!(
                 "Google maps taso tallennettu: {CYAN}{}{RESET}",
@@ -237,28 +289,15 @@ fn run(options: RunOptions) -> Result<()> {
         }
         Err(_) => println!(
             "Google maps taso tallennettu: {CYAN}{}{RESET}",
-            kml_file.display()
+            kml_path.display()
         ),
     }
 
-    // Excel-yhteenveto
-    let excel_file = match &output_file_dir {
-        Some(dir) => dir.join(generate_filename(property_id, ".xlsx")),
-        None => PathBuf::from(generate_filename(property_id, ".xlsx")),
-    };
-    metsaval::excel::export(
-        &excel_file,
-        &totals,
-        &stand_values,
-        &species_summary,
-        &timber_values,
-        &raw_rows,
-        &fixed_costs,
-    )?;
+    let excel_path = excel_result?;
 
     // Yritä näyttää tiedoston täysi polku, näyttää vain tiedoston nimen
     // jos se ei onnistu
-    match std::fs::canonicalize(&excel_file) {
+    match std::fs::canonicalize(&excel_path) {
         Ok(path) => {
             println!(
                 "Excel-yhteenveto tallennettu: {CYAN}{}{RESET}",
@@ -267,7 +306,7 @@ fn run(options: RunOptions) -> Result<()> {
         }
         Err(_) => println!(
             "Excel-yhteenveto tallennettu: {CYAN}{}{RESET}",
-            excel_file.display()
+            excel_path.display()
         ),
     }
 
@@ -392,9 +431,9 @@ fn ask_confirmation_from<R: BufRead, W: Write>(reader: &mut R, writer: &mut W) -
 
 /// Palauttaa kiinteistön geometrian yhdistettynä yhteen MultiPolygoniin, ja kiinteistöllä sijaitsevien
 /// palstojen määrän
-fn get_property_geometry(property_id: &str, api_key: &str) -> Result<(MultiPolygon, usize)> {
+async fn get_property_geometry(property_id: &str, api_key: &str) -> Result<(MultiPolygon, usize)> {
     // Kiinteistön palstat MML:stä
-    let property_features = metsaval::mml::get_property_features(property_id, api_key)?;
+    let property_features = metsaval::mml::get_property_features(property_id, api_key).await?;
     let property_geometry = combine_property_geometries(property_id, &property_features)?;
 
     Ok((property_geometry, property_features.len()))

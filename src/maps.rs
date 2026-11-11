@@ -259,6 +259,36 @@ pub fn write_kml(kml_data: &str, file_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Generoi KML-dokumentin ja kirjoittaa sen levylle.
+///
+/// Kokoaminen ja tiedoston kirjoittaminen ovat synkronisia ja hieman
+/// CPU:ta kuormittavia, joten ne ajetaan `spawn_blocking`-taustasäikeessä.
+/// Tämä pitää asynkronisen runtimen vapaana ja mahdollistaa samanaikaisen
+/// Excel-kirjoituksen. Palauttaa tiedoston polun, jotta kutsuja ei tarvitse
+/// pitää siitä omaa kopioitaan.
+///
+/// Huomio: taustasäikeen suoritusta ei voi peruuttaa - se jatkaa
+/// tiedostoon kirjoittamista, vaikka kutsuja lopettaisi odottamisen.
+pub async fn generate_and_write_kml(
+    features: Vec<Feature>,
+    property: MultiPolygon<f64>,
+    stand_values: Vec<StandValue>,
+    file_path: PathBuf,
+) -> Result<PathBuf> {
+    // `move` siirtää omistajuuden sulkeumaan, koska taustasäikeen on
+    // oltava 'static - se ei saa viitata kutsujan pinoon.
+    tokio::task::spawn_blocking(move || -> Result<PathBuf> {
+        let kml_data = generate_kml(&features, &property, &stand_values)?;
+        write_kml(&kml_data, &file_path)?;
+        Ok(file_path)
+    })
+    // `.await` on `Result<Result<PathBuf, Report>, JoinError>`: yksi `?`
+    // poistaa taustasäikeen `JoinError`in (säikeen kaatuminen tai peruutus)
+    // ja muuntaa sen virheeksi. Jäljelle jäävä `Result` on suoraan
+    // funktion paluuarvo.
+    .await?
+}
+
 fn hyperlink(url: &str) -> String {
     format!("\x1b]8;;{url}\x1b\\{url}\x1b]8;;\x1b\\")
 }
@@ -529,6 +559,26 @@ mod tests {
         let path = dir.file("test.kml");
         write_kml("<kml/>", &path).unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "<kml/>");
+    }
+
+    #[tokio::test]
+    async fn generate_and_write_kml_writes_the_file() {
+        let dir = crate::test_support::TempDir::new("maps_async");
+        let path = dir.file("async.kml");
+
+        let written = generate_and_write_kml(
+            vec![stand_feature(11)],
+            property(),
+            vec![stand_value(11)],
+            path.clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(written, path, "palautettava polku on annettu polku");
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("<kml xmlns=\"http://www.opengis.net/kml/2.2\">"));
+        assert_eq!(placemark_count(&content), 2, "rajat + kuvio");
     }
 
     #[test]

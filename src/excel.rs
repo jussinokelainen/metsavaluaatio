@@ -143,6 +143,41 @@ pub fn export(
     )
 }
 
+/// Kirjoittaa Excel-yhteenvedon levylle.
+///
+/// Synkroninen `export` ajetaan `spawn_blocking`-taustasäikeessä, jotta se
+/// ei blokkaa asynkronista runtimea ja KML-tason kirjoitus voi olla samalla
+/// kertaa rinnakkain. Kaikki argumentit siirtyvät omistajuutena, koska
+/// taustasäikeen on oltava `'static`. Palauttaa tiedoston polun.
+///
+/// Katso myös `maps::generate_and_write_kml`.
+pub async fn export_async(
+    path: PathBuf,
+    totals: Totals,
+    stand_values: Vec<StandValue>,
+    species_summary: Vec<SpeciesSummary>,
+    timber_values: Vec<TimberValue>,
+    raw_rows: Vec<RawRow>,
+    fixed_costs: f64,
+) -> Result<PathBuf> {
+    tokio::task::spawn_blocking(move || -> Result<PathBuf> {
+        export(
+            &path,
+            &totals,
+            &stand_values,
+            &species_summary,
+            &timber_values,
+            &raw_rows,
+            &fixed_costs,
+        )?;
+        Ok(path)
+    })
+    // `.await` on `Result<Result<PathBuf, Report>, JoinError>`: yksi `?`
+    // poistaa taustasäikeen `JoinError`in ja muuntaa sen virheeksi,
+    // lopputulos on funktion paluuarvo.
+    .await?
+}
+
 fn summary_sheet(totals: &Totals, fixed_costs: &f64) -> Sheet {
     Sheet {
         name: "Yhteenveto".to_string(),
@@ -662,6 +697,29 @@ mod tests {
         // Hinnasto ei silti ole tyhjä
         let prices = read_entry(&path, "xl/worksheets/sheet6.xml");
         assert!(prices.contains("<row r=\"2\""));
+    }
+
+    #[tokio::test]
+    async fn export_async_writes_the_workbook() {
+        let dir = crate::test_support::TempDir::new("excel_async");
+        let path = dir.file("async.xlsx");
+
+        let written = export_async(
+            path.clone(),
+            totals(),
+            vec![stand_value()],
+            vec![species_summary()],
+            vec![timber_value()],
+            vec![raw_row()],
+            109.0,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(written, path, "palautettava polku on annettu polku");
+        let workbook = read_entry(&path, "xl/workbook.xml");
+        assert!(workbook.contains("name=\"Yhteenveto\""));
+        assert!(workbook.contains("name=\"Kuvioittain\""));
     }
 
     #[test]

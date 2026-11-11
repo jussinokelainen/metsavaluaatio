@@ -11,19 +11,19 @@ pub struct Layer {
 }
 
 /// Hakee WFS GetCapabilities -vastauksen.
-pub fn get_capabilities(wfs_url: &str) -> Result<Vec<u8>> {
+pub async fn get_capabilities(wfs_url: &str) -> Result<Vec<u8>> {
     let params = [
         ("service", "WFS"),
         ("version", "2.0.0"),
         ("request", "GetCapabilities"),
     ];
 
-    http::get_bytes(wfs_url, &params, 120)
+    http::get_bytes(wfs_url, &params, 120).await
 }
 
 /// Listaa WFS-rajapinnan karttatasot.
-pub fn get_layers(wfs_url: &str) -> Result<Vec<Layer>> {
-    let content = get_capabilities(wfs_url)?;
+pub async fn get_layers(wfs_url: &str) -> Result<Vec<Layer>> {
+    let content = get_capabilities(wfs_url).await?;
     let text = std::str::from_utf8(&content)?;
     let root: Element = text.parse()?;
 
@@ -89,7 +89,7 @@ pub fn select_stand_layer(layers: &[Layer]) -> Result<String> {
 }
 
 /// Hakee WFS-kuviot annetulla rajauslaatikolla (bbox).
-pub fn get_features_bbox(
+pub async fn get_features_bbox(
     wfs_url: &str,
     layer: &str,
     bbox: &str,
@@ -108,7 +108,7 @@ pub fn get_features_bbox(
         ("maxFeatures", max_features.as_str()),
     ];
 
-    let value = http::get_json(wfs_url, &params, 180)?;
+    let value = http::get_json(wfs_url, &params, 180).await?;
     Ok(extract_features(value))
 }
 
@@ -268,11 +268,11 @@ mod tests {
         assert!(root.parse::<Element>().is_err());
     }
 
-    #[test]
-    fn get_capabilities_fetches_the_document_with_wfs_parameters() {
+    #[tokio::test]
+    async fn get_capabilities_fetches_the_document_with_wfs_parameters() {
         let (url, log) = serve_once("200 OK", "application/xml", CAPABILITIES);
 
-        let content = get_capabilities(&url).unwrap();
+        let content = get_capabilities(&url).await.unwrap();
         assert_eq!(std::str::from_utf8(&content).unwrap(), CAPABILITIES);
 
         let request = log.lock().unwrap().clone();
@@ -286,30 +286,30 @@ mod tests {
         assert!(first_line.contains("request=GetCapabilities"));
     }
 
-    #[test]
-    fn get_layers_fetches_and_parses_the_document() {
+    #[tokio::test]
+    async fn get_layers_fetches_and_parses_the_document() {
         let (url, _log) = serve_once("200 OK", "application/xml", CAPABILITIES);
 
-        let layers = get_layers(&url).unwrap();
+        let layers = get_layers(&url).await.unwrap();
         assert_eq!(layers.len(), 2);
         assert_eq!(layers[0].name, "mv:tk2");
         assert_eq!(layers[1].name, "mv:kanta");
     }
 
-    #[test]
-    fn get_layers_rejects_malformed_xml() {
+    #[tokio::test]
+    async fn get_layers_rejects_malformed_xml() {
         let (url, _log) = serve_once("200 OK", "application/xml", "<WFS_Capabilities><unclosed>");
-        assert!(get_layers(&url).is_err());
+        assert!(get_layers(&url).await.is_err());
     }
 
-    #[test]
-    fn get_layers_reports_http_errors() {
+    #[tokio::test]
+    async fn get_layers_reports_http_errors() {
         let (url, _log) = serve_once("500 Internal Server Error", "text/plain", "poks");
-        assert!(get_layers(&url).is_err());
+        assert!(get_layers(&url).await.is_err());
     }
 
-    #[test]
-    fn get_features_bbox_sends_the_query_and_returns_features() {
+    #[tokio::test]
+    async fn get_features_bbox_sends_the_query_and_returns_features() {
         let body = json!({
             "type": "FeatureCollection",
             "features": [
@@ -330,6 +330,7 @@ mod tests {
             "EPSG:3067",
             10_000,
         )
+        .await
         .unwrap();
         assert_eq!(features.len(), 1);
         assert_eq!(
@@ -348,10 +349,12 @@ mod tests {
         assert!(first_line.contains("maxFeatures=10000"));
     }
 
-    #[test]
-    fn get_features_bbox_tolerates_a_payload_without_features() {
+    #[tokio::test]
+    async fn get_features_bbox_tolerates_a_payload_without_features() {
         let (url, _log) = serve_once("200 OK", "application/json", "{}");
-        let features = get_features_bbox(&url, "mv:tk2", "1,2,3,4", "EPSG:3067", 10).unwrap();
+        let features = get_features_bbox(&url, "mv:tk2", "1,2,3,4", "EPSG:3067", 10)
+            .await
+            .unwrap();
         assert!(features.is_empty());
     }
 }
