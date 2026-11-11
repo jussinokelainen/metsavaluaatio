@@ -42,7 +42,7 @@ fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
     ));
     kml.push_str(&new_data(
         "Tilavuuskasvuprosentti",
-        values.growth_pct.and_then(|p| Some(format!("{:.2}", p))),
+        values.growth_pct.map(|p| format!("{:.2}", p)),
     ));
 
     kml.push_str(&new_data(
@@ -205,7 +205,7 @@ fn clip_stand_geometry(
 pub fn generate_kml(
     features: &[Feature],
     property: &MultiPolygon<f64>,
-    stand_values: &Vec<StandValue>,
+    stand_values: &[StandValue],
 ) -> Result<String> {
     let mut kml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -241,7 +241,7 @@ pub fn generate_kml(
         let mp_wgs84 = geo_utils::transform(&geometry, &to_wgs84);
 
         for polygon in &mp_wgs84.0 {
-            kml.push_str(&create_placemark(polygon, &values));
+            kml.push_str(&create_placemark(polygon, values));
         }
     }
 
@@ -254,12 +254,12 @@ pub fn generate_kml(
 }
 
 pub fn write_kml(kml_data: &str, file_path: &PathBuf) -> Result<()> {
-    std::fs::write(&file_path, kml_data)?;
+    std::fs::write(file_path, kml_data)?;
 
     Ok(())
 }
 
-fn hyperlink<'a>(url: &'a str) -> String {
+fn hyperlink(url: &str) -> String {
     format!("\x1b]8;;{url}\x1b\\{url}\x1b]8;;\x1b\\")
 }
 

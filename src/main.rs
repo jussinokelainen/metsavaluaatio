@@ -1,6 +1,5 @@
 use chrono::{Local, SubsecRound};
 use color_eyre::{Result, eyre::eyre};
-use dirs;
 use geo::{HasDimensions, MultiPolygon};
 use metsaval::consts::{CYAN, GREEN, RED, RESET, YELLOW};
 use metsaval::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
@@ -312,8 +311,8 @@ fn pad_property_id(id: &str) -> Result<String> {
 
     let mut padded_parts = Vec::new();
     // Ensimmäiset 2 on 3 numeroa
-    for i in 0..2 {
-        let mut value = String::from(parts[i]);
+    for &item in parts.iter().take(2) {
+        let mut value = String::from(item);
         if value.len() > 3 {
             return Err(eyre!("Virheellinen kiinteistötunnus"));
         }
@@ -332,8 +331,8 @@ fn pad_property_id(id: &str) -> Result<String> {
     }
 
     // Viimeiset 2 on 4 numeroa
-    for i in 2..4 {
-        let mut value = String::from(parts[i]);
+    for &item in parts.iter().take(4).skip(2) {
+        let mut value = String::from(item);
         if value.len() > 4 {
             return Err(eyre!("Virheellinen kiinteistötunnus"));
         }
@@ -356,11 +355,11 @@ fn pad_property_id(id: &str) -> Result<String> {
     }
 
     let mut out = padded_parts[0].clone();
-    out.push_str("-");
+    out.push('-');
     out.push_str(&padded_parts[1]);
-    out.push_str("-");
+    out.push('-');
     out.push_str(&padded_parts[2]);
-    out.push_str("-");
+    out.push('-');
     out.push_str(&padded_parts[3]);
 
     Ok(out)
@@ -413,10 +412,10 @@ fn combine_property_geometries(
 
     let mut geometries_wgs84 = Vec::new();
     for feature in property_features {
-        if let Some(geometry) = metsaval::geo_utils::feature_to_multipolygon(feature) {
-            if !geometry.is_empty() {
-                geometries_wgs84.push(geometry);
-            }
+        if let Some(geometry) = metsaval::geo_utils::feature_to_multipolygon(feature)
+            && !geometry.is_empty()
+        {
+            geometries_wgs84.push(geometry);
         }
     }
 

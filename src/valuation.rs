@@ -263,15 +263,11 @@ pub fn tree_net_gain(
     v_sawlog: f64,
     v_pulpwood: f64,
     v_growth: f64,
-    q: Option<f64>,
+    // q: Option<f64>,
 ) -> Option<f64> {
     // Ennen laskuja tarkistaa funktion ottavat Option parametrit
-    let Some(height) = height else {
-        return None;
-    };
-    let Some(diameter) = diameter else {
-        return None;
-    };
+    let height = height?;
+    let diameter = diameter?;
 
     // Valitsee oikean puulajin Tmax, k, Gtav ja q arvot
     let (tmax, k, gtav, q_default) = match puulaji {
@@ -291,10 +287,11 @@ pub fn tree_net_gain(
     };
 
     // Jos funktion kutsuja antoi q arvon, käyttää sitä
-    let q = match q {
-        Some(q) => q,
-        None => q_default,
-    };
+    // let q = match q {
+    //     Some(q) => q,
+    //     None => q_default,
+    // };
+    let q = q_default;
 
     let t0 = v_sawlog / (v_sawlog + v_pulpwood);
     let g = v_growth / (v_sawlog + v_pulpwood);
@@ -330,19 +327,17 @@ pub fn calculate_value_growth(row: &SpeciesSummary) -> Option<f64> {
     let sawlog_corr = sawlog_percentage * total_volume;
     let pulpwood_corr = (1.0 - sawlog_percentage) * total_volume;
 
-    match tree_net_gain(
-        row.species,
-        row.meandiameter,
-        row.meanheight,
-        row.stemcount,
-        sawlog_corr,
-        pulpwood_corr,
-        row.volumegrowth,
-        None,
-    ) {
-        Some(net) => Some(100.0 * net),
-        None => None,
-    }
+    Some(
+        tree_net_gain(
+            row.species,
+            row.meandiameter,
+            row.meanheight,
+            row.stemcount,
+            sawlog_corr,
+            pulpwood_corr,
+            row.volumegrowth,
+        )? * 100.0,
+    )
 }
 
 /// Laskee puulajikohtaisen arvon (€) kuvion tietojen perusteella.
@@ -554,8 +549,8 @@ pub fn build_fixed_costs(stand_values: &[StandValue]) -> f64 {
 }
 
 fn calculate_sawlog_pct(sawlog: Option<f64>, pulp: Option<f64>) -> Option<f64> {
-    let Some(sawlog) = sawlog else { return None };
-    let Some(pulp) = pulp else { return None };
+    let sawlog = sawlog?;
+    let pulp = pulp?;
 
     Some((sawlog / (sawlog + pulp)) * 100.0)
 }
@@ -664,7 +659,7 @@ fn grouped(value: f64) -> String {
     let mut result = String::new();
     let chars: Vec<char> = digits.chars().collect();
     for (index, ch) in chars.iter().enumerate() {
-        if index > 0 && (chars.len() - index) % 3 == 0 {
+        if index > 0 && (chars.len() - index).is_multiple_of(3) {
             result.push(' ');
         }
         result.push(*ch);
@@ -680,7 +675,7 @@ pub fn create_dataset_summary(
     totals: &Totals,
 ) -> String {
     let mut summary = String::new();
-    summary.push_str(&format!("\n"));
+    summary.push('\n');
     summary.push_str(&format!(
         "
 {CYAN}----------{RESET}
@@ -728,7 +723,7 @@ fn grouped_precise(value: f64, decimals: usize) -> String {
     let chars: Vec<char> = digits.chars().collect();
     let mut grouped = String::new();
     for (index, ch) in chars.iter().enumerate() {
-        if index > 0 && (chars.len() - index) % 3 == 0 {
+        if index > 0 && (chars.len() - index).is_multiple_of(3) {
             grouped.push(' ');
         }
         grouped.push(*ch);
@@ -1398,29 +1393,11 @@ mod tests {
     #[test]
     fn tree_net_gain_needs_both_dimensions() {
         assert_eq!(
-            tree_net_gain(
-                Species::Kuusi,
-                None,
-                Some(15.0),
-                1000.0,
-                40.0,
-                60.0,
-                5.0,
-                None
-            ),
+            tree_net_gain(Species::Kuusi, None, Some(15.0), 1000.0, 40.0, 60.0, 5.0,),
             None
         );
         assert_eq!(
-            tree_net_gain(
-                Species::Kuusi,
-                Some(20.0),
-                None,
-                1000.0,
-                40.0,
-                60.0,
-                5.0,
-                None
-            ),
+            tree_net_gain(Species::Kuusi, Some(20.0), None, 1000.0, 40.0, 60.0, 5.0,),
             None
         );
         assert_eq!(
@@ -1432,7 +1409,6 @@ mod tests {
                 40.0,
                 60.0,
                 5.0,
-                None
             ),
             None
         );
@@ -1448,7 +1424,6 @@ mod tests {
             40.0,
             60.0,
             0.0,
-            None,
         );
         assert_close(gain.unwrap(), 0.0);
     }
@@ -1463,7 +1438,6 @@ mod tests {
             40.0,
             60.0,
             5.0,
-            None,
         )
         .unwrap();
         let large = tree_net_gain(
@@ -1474,39 +1448,11 @@ mod tests {
             40.0,
             60.0,
             20.0,
-            None,
         )
         .unwrap();
 
         assert!(small > 0.0, "kasvava puu tuottaa arvokasvua: {small}");
         assert!(large > small, "{large} pitäisi olla suurempi kuin {small}");
-    }
-
-    #[test]
-    fn tree_net_gain_uses_the_given_q_instead_of_the_default() {
-        let default_q = tree_net_gain(
-            Species::Kuusi,
-            Some(20.0),
-            Some(15.0),
-            1000.0,
-            40.0,
-            60.0,
-            10.0,
-            None,
-        )
-        .unwrap();
-        let custom_q = tree_net_gain(
-            Species::Kuusi,
-            Some(20.0),
-            Some(15.0),
-            1000.0,
-            40.0,
-            60.0,
-            10.0,
-            Some(1.0),
-        )
-        .unwrap();
-        assert_ne!(default_q, custom_q);
     }
 
     #[test]
@@ -1521,7 +1467,6 @@ mod tests {
             40.0,
             60.0,
             5.0,
-            None,
         )
         .unwrap();
         assert!(short > 0.0, "tulos: {short}");
@@ -1534,7 +1479,6 @@ mod tests {
             40.0,
             60.0,
             0.0,
-            None,
         )
         .unwrap();
         assert_close(no_growth, 0.0);
@@ -1552,7 +1496,6 @@ mod tests {
             0.1,
             100.0,
             5.0,
-            None,
         )
         .unwrap();
         // Kun t1 == t0, nettokasvu on täsmälleen kasvusuhde g
@@ -1583,7 +1526,6 @@ mod tests {
             40.0,
             60.0,
             10.0,
-            None,
         )
         .unwrap();
         assert_close(growth, direct * 100.0);

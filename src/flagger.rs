@@ -84,14 +84,14 @@ pub fn parse_args(input: Flagset, custom_args: Option<&[&str]>) -> Result<Argume
             return true;
         }
 
-        if let Some(o_flags) = &input.opt_flags {
-            if o_flags.contains(&flag.as_str()) {
-                if had_value_with_equals {
-                    return true;
-                }
-                if (num + 1) < input_args.len() && !input_args[num + 1].starts_with('-') {
-                    return true;
-                }
+        if let Some(o_flags) = &input.opt_flags
+            && o_flags.contains(&flag.as_str())
+        {
+            if had_value_with_equals {
+                return true;
+            }
+            if (num + 1) < input_args.len() && !input_args[num + 1].starts_with('-') {
+                return true;
             }
         }
 
@@ -186,10 +186,10 @@ pub fn parse_args(input: Flagset, custom_args: Option<&[&str]>) -> Result<Argume
 
                     // Handle the last character before the '='
                     // as the flag that takes the string after the '=' as its value
-                    if let Some(val_flag) = full_flag.chars().nth(last_flag_pos) {
-                        if let Some((_, value)) = full_flag.split_once('=') {
-                            handle_flag(val_flag.to_string(), Some(value), &mut count)?;
-                        }
+                    if let Some(val_flag) = full_flag.chars().nth(last_flag_pos)
+                        && let Some((_, value)) = full_flag.split_once('=')
+                    {
+                        handle_flag(val_flag.to_string(), Some(value), &mut count)?;
                     }
                 }
             } else {

@@ -95,7 +95,7 @@ fn write_workbook(path: &PathBuf, sheets: &[Sheet]) -> Result<()> {
                 }
             }
 
-            let width = ((max_length + 2).max(10)).min(30);
+            let width = (max_length + 2).clamp(10, 30);
             worksheet.set_column_width(column as u16, width as f64)?;
         }
 

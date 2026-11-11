@@ -35,13 +35,13 @@ pub fn get_layers(wfs_url: &str) -> Result<Vec<Layer>> {
 
 fn collect_feature_types(element: &Element, out: &mut Vec<Layer>) {
     for child in element.children() {
-        if child.name() == "FeatureType" {
-            if let Some(name) = child_text(child, "Name") {
-                out.push(Layer {
-                    title: child_text(child, "Title").unwrap_or_default(),
-                    name,
-                });
-            }
+        if child.name() == "FeatureType"
+            && let Some(name) = child_text(child, "Name")
+        {
+            out.push(Layer {
+                title: child_text(child, "Title").unwrap_or_default(),
+                name,
+            });
         }
 
         collect_feature_types(child, out);
