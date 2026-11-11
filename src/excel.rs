@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::consts::{Cutting, PRICES, Species, TimberType};
 use crate::model::{RawRow, SpeciesSummary, StandValue, TimberValue, Totals};
@@ -55,7 +55,7 @@ fn headers(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| value.to_string()).collect()
 }
 
-fn write_workbook(path: &PathBuf, sheets: &[Sheet]) -> Result<()> {
+fn write_workbook(path: &Path, sheets: &[Sheet]) -> Result<()> {
     let mut workbook = Workbook::new();
     let header_format = Format::new().set_bold().set_align(FormatAlign::Center);
 
@@ -115,7 +115,7 @@ fn write_workbook(path: &PathBuf, sheets: &[Sheet]) -> Result<()> {
 
 /// Kirjoittaa koko Excel-yhteenvedon (6 välilehteä) annettuun polkuun.
 pub fn export(
-    path: &PathBuf,
+    path: &Path,
     totals: &Totals,
     stand_values: &[StandValue],
     species_summary: &[SpeciesSummary],

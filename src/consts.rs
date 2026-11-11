@@ -53,13 +53,14 @@ pub enum Species {
 }
 
 impl Species {
-    /// Metsäkeskuksen `treespecies`-koodi -> puulaji.
-    pub fn from_code(code: i64) -> Option<Self> {
+    /// Metsäkeskuksen `treespecies`-koodi -> puulaji. Tuntematon koodi
+    /// tulkitaan puulajiksi `Muu`.
+    pub fn from_code(code: i64) -> Self {
         match code {
-            1 => Some(Self::Manty),
-            2 => Some(Self::Kuusi),
-            29 => Some(Self::Koivu),
-            _ => Some(Self::Muu),
+            1 => Self::Manty,
+            2 => Self::Kuusi,
+            29 => Self::Koivu,
+            _ => Self::Muu,
         }
     }
 
@@ -516,15 +517,15 @@ mod tests {
 
     #[test]
     fn species_from_code_maps_known_codes() {
-        assert_eq!(Species::from_code(1), Some(Species::Manty));
-        assert_eq!(Species::from_code(2), Some(Species::Kuusi));
-        assert_eq!(Species::from_code(29), Some(Species::Koivu));
+        assert_eq!(Species::from_code(1), Species::Manty);
+        assert_eq!(Species::from_code(2), Species::Kuusi);
+        assert_eq!(Species::from_code(29), Species::Koivu);
     }
 
     #[test]
     fn species_from_unknown_codes_gives_muu() {
-        assert_eq!(Species::from_code(0), Some(Species::Muu));
-        assert_eq!(Species::from_code(99), Some(Species::Muu));
+        assert_eq!(Species::from_code(0), Species::Muu);
+        assert_eq!(Species::from_code(99), Species::Muu);
     }
 
     #[test]

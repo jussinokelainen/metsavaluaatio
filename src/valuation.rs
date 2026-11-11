@@ -99,7 +99,6 @@ pub fn build_species_summary(
     stands: &[Stand],
 ) -> Result<Vec<SpeciesSummary>> {
     let mut rows: Vec<StratumRow> = Vec::new();
-    let mut unknown_species: Vec<i64> = Vec::new();
 
     for stratum in strata {
         let Some(stand) = stands
@@ -109,20 +108,11 @@ pub fn build_species_summary(
             continue;
         };
 
-        match Species::from_code(stratum.treespecies) {
-            Some(species) => rows.push(StratumRow {
-                stratum,
-                stand,
-                species,
-            }),
-            None => unknown_species.push(stratum.treespecies),
-        }
-    }
-
-    if !unknown_species.is_empty() {
-        unknown_species.sort_unstable();
-        unknown_species.dedup();
-        color_eyre::eyre::bail!("Tuntematon puulaji: {unknown_species:?}");
+        rows.push(StratumRow {
+            stratum,
+            stand,
+            species: Species::from_code(stratum.treespecies),
+        });
     }
 
     rows.sort_by(species_key_cmp);
@@ -575,9 +565,7 @@ pub fn build_raw_rows(
             .iter()
             .find(|summary| summary.standid == stratum.standid);
 
-        let Some(species) = Species::from_code(stratum.treespecies) else {
-            color_eyre::eyre::bail!("Tuntematon puulaji: {}", stratum.treespecies);
-        };
+        let species = Species::from_code(stratum.treespecies);
 
         rows.push(RawRow {
             standid: stratum.standid,

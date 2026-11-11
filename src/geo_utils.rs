@@ -66,6 +66,18 @@ pub fn bounds(polygon: &MultiPolygon<f64>) -> Option<(f64, f64, f64, f64)> {
 /// Leikkaa yhden WFS-kuvion kiinteistön geometriaan ja palauttaa kuvion
 /// Metsäkeskuksen ominaisuustiedoilla, jos leikkauspinta-ala on riittävä.
 pub fn clip_stand(feature: &geojson::Feature, property: &MultiPolygon<f64>) -> Option<Stand> {
+    clip_stand_with_geometry(feature, property).map(|(stand, _)| stand)
+}
+
+/// Kuten `clip_stand`, mutta palauttaa myös leikatun geometrian.
+///
+/// Leikkaus on geometrialaskennan kallein vaihe, joten sen tekeminen kerran
+/// ja molempien tulosten palauttaminen säästää työtä kutsujilta, jotka
+/// tarvitsevat sekä kuvion tiedot että geometrian (esim. KML-taso).
+pub fn clip_stand_with_geometry(
+    feature: &geojson::Feature,
+    property: &MultiPolygon<f64>,
+) -> Option<(Stand, MultiPolygon<f64>)> {
     let geometry = feature_to_multipolygon(feature)?;
     let intersection: MultiPolygon<f64> = geometry.intersection(property);
     let area = area_m2(&intersection);
@@ -76,7 +88,7 @@ pub fn clip_stand(feature: &geojson::Feature, property: &MultiPolygon<f64>) -> O
 
     let props = feature.properties.as_ref();
 
-    Some(Stand {
+    let stand = Stand {
         standid: props.and_then(|p| p.get("standid")).and_then(value_i64),
         standnumber: props.and_then(|p| p.get("standnumber")).and_then(value_i64),
         cuttingtype: props.and_then(|p| p.get("cuttingtype")).and_then(value_i64),
@@ -86,7 +98,9 @@ pub fn clip_stand(feature: &geojson::Feature, property: &MultiPolygon<f64>) -> O
         area: props.and_then(|p| p.get("area")).and_then(value_f64),
         intersection_area_m2: area,
         intersection_area_ha: area / 10_000.0,
-    })
+    };
+
+    Some((stand, intersection))
 }
 
 /// JSON-arvo -> f64 (hyväksyy myös numeerisen merkkijonon).

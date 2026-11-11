@@ -3,11 +3,13 @@ use crate::consts::{RED, RESET, YELLOW};
 use crate::geo_utils;
 use crate::model::StandValue;
 use color_eyre::Result;
-use geo::{BooleanOps, MultiPolygon, Polygon};
+use geo::{MultiPolygon, Polygon};
 use geojson::Feature;
 use proj::Proj;
 use rand::RngExt;
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::fmt::Write as _;
+use std::path::{Path, PathBuf};
 
 /// Luo metsäkuvion koordinaatistosta kml tiedostoon xml:laa
 fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
@@ -52,10 +54,11 @@ fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
             (values.sawlogvolume / (values.sawlogvolume + values.pulpwoodvolume)) * 100.0
         )),
     ));
-    if let Some(code) = values.main_species
-        && let Some(mts) = Species::from_code(code)
-    {
-        kml.push_str(&new_data("Pääpuulaji", Some(mts.name())));
+    if let Some(code) = values.main_species {
+        kml.push_str(&new_data(
+            "Pääpuulaji",
+            Some(Species::from_code(code).name()),
+        ));
     }
     if let Some(cutting) = values.cutting {
         kml.push_str(&new_data("Hakkuuehdotus", Some(cutting.name())));
@@ -74,7 +77,7 @@ fn create_placemark(property: &Polygon<f64>, values: &StandValue) -> String {
     // lisää koordinaatit tiedostoon
     kml.push_str("            <Polygon><outerBoundaryIs><LinearRing><coordinates>\n");
     for coord in property.exterior().coords() {
-        kml.push_str(&format!("                {},{},0\n", coord.x, coord.y));
+        let _ = writeln!(kml, "                {},{},0", coord.x, coord.y);
     }
     kml.push_str(
         "            </coordinates></LinearRing></outerBoundaryIs></Polygon>
@@ -105,7 +108,7 @@ fn add_property_outline(property: &MultiPolygon) -> String {
     for polygon in &property.0 {
         kml.push_str("                <Polygon><outerBoundaryIs><LinearRing><coordinates>\n");
         for coord in polygon.exterior().coords() {
-            kml.push_str(&format!("                    {},{},0\n", coord.x, coord.y));
+            let _ = writeln!(kml, "                    {},{},0", coord.x, coord.y);
         }
         kml.push_str("                </coordinates></LinearRing></outerBoundaryIs></Polygon>\n");
     }
@@ -178,29 +181,6 @@ fn random_color() -> &'static str {
     colors[idx]
 }
 
-/// Palauttaa metsäkuvion jos se on annetulla palstalla, muuten palauttaa None
-fn clip_stand_geometry(
-    feature: &geojson::Feature,
-    property: &geo::MultiPolygon<f64>,
-) -> Option<geo::MultiPolygon<f64>> {
-    let geometry = feature.geometry.as_ref()?;
-    let stand_geometry: geo::Geometry<f64> = geometry.value.clone().try_into().ok()?;
-
-    let stand_polygon = match stand_geometry {
-        geo::Geometry::Polygon(polygon) => geo::MultiPolygon(vec![polygon]),
-        geo::Geometry::MultiPolygon(multipolygon) => multipolygon,
-        _ => return None,
-    };
-
-    let intersection = stand_polygon.intersection(property);
-
-    if intersection.0.is_empty() {
-        return None;
-    }
-
-    Some(intersection)
-}
-
 /// Luo kml tiedoston jonka voi importata google mapsiin tasoksi
 pub fn generate_kml(
     features: &[Feature],
@@ -218,12 +198,16 @@ pub fn generate_kml(
     kml.push_str(&add_property_outline(&geo_utils::transform(
         property, &to_wgs84,
     )));
-    for feature in features {
-        let Some(geometry) = clip_stand_geometry(feature, property) else {
-            continue;
-        };
 
-        let Some(stand) = geo_utils::clip_stand(feature, property) else {
+    // Hakemisto välttää lineaarisen haun jokaista kuviota kohden.
+    let values_by_stand: HashMap<i64, &StandValue> = stand_values
+        .iter()
+        .map(|values| (values.standid, values))
+        .collect();
+
+    for feature in features {
+        // Yksi leikkaus riittää: saadaan sekä kuvion tiedot että geometria.
+        let Some((stand, geometry)) = geo_utils::clip_stand_with_geometry(feature, property) else {
             continue;
         };
 
@@ -231,7 +215,7 @@ pub fn generate_kml(
             continue;
         };
 
-        let Some(values) = stand_values.iter().find(|s| s.standid == stand_id) else {
+        let Some(values) = values_by_stand.get(&stand_id) else {
             println!(
                 "{RED}Tietoa ei löytynyt metsäkuviolle {stand_id}{RESET}, tuntematon puulaji?"
             );
@@ -253,7 +237,7 @@ pub fn generate_kml(
     Ok(kml)
 }
 
-pub fn write_kml(kml_data: &str, file_path: &PathBuf) -> Result<()> {
+pub fn write_kml(kml_data: &str, file_path: &Path) -> Result<()> {
     std::fs::write(file_path, kml_data)?;
 
     Ok(())
@@ -624,19 +608,21 @@ mod tests {
     }
 
     #[test]
-    fn clip_stand_geometry_clips_to_the_property() {
+    fn clip_stand_with_geometry_clips_to_the_property() {
         let overlapping = stand_feature(11);
-        let clipped = clip_stand_geometry(&overlapping, &property()).unwrap();
+        let (stand, clipped) =
+            geo_utils::clip_stand_with_geometry(&overlapping, &property()).unwrap();
+        assert_eq!(stand.standid, Some(11));
         assert!((geo_utils::area_m2(&clipped) - 10_000.0).abs() < 1e-6);
 
         let outside = feature_with_geometry(Some(11), polygon_at(500_000.0, 6_900_000.0, 100.0));
-        assert!(clip_stand_geometry(&outside, &property()).is_none());
+        assert!(geo_utils::clip_stand_with_geometry(&outside, &property()).is_none());
 
         let mut point = stand_feature(11);
         point.geometry = Some(geojson::Geometry::new(
             serde_json::from_value(json!({"type": "Point", "coordinates": [1.0, 2.0]})).unwrap(),
         ));
-        assert!(clip_stand_geometry(&point, &property()).is_none());
+        assert!(geo_utils::clip_stand_with_geometry(&point, &property()).is_none());
     }
 
     /// Luo Featuren, jonka geometria on MultiPolygon.
@@ -659,8 +645,9 @@ mod tests {
     }
 
     #[test]
-    fn clip_stand_geometry_accepts_multipolygon_geometries() {
-        let clipped = clip_stand_geometry(&multipolygon_feature(11), &property()).unwrap();
+    fn clip_stand_with_geometry_accepts_multipolygon_geometries() {
+        let (_, clipped) =
+            geo_utils::clip_stand_with_geometry(&multipolygon_feature(11), &property()).unwrap();
         assert!((geo_utils::area_m2(&clipped) - 2_500.0).abs() < 1e-6);
 
         let kml = generate_kml(
@@ -679,10 +666,9 @@ mod tests {
         let sliver = feature_with_geometry(Some(11), polygon_at(385_099.995, 6_700_000.0, 100.0));
 
         assert!(
-            clip_stand_geometry(&sliver, &property()).is_some(),
-            "pieni leikkaus on geometria-stateessa sallittu"
+            geo_utils::clip_stand_with_geometry(&sliver, &property()).is_none(),
+            "liian pieni leikkaus hylätään"
         );
-        assert!(geo_utils::clip_stand(&sliver, &property()).is_none());
 
         let kml = generate_kml(&[sliver], &property(), &vec![stand_value(11)]).unwrap();
         assert_eq!(placemark_count(&kml), 1, "vain kiinteistön rajat");

@@ -1,7 +1,22 @@
 use color_eyre::Result;
 use reqwest::{Client, Response};
 use serde_json::Value;
+use std::sync::LazyLock;
 use std::time::Duration;
+
+/// Yksi jaettu HTTP-asiakas kaikille pyynnöille.
+///
+/// Asiakkaan uudelleenkäyttö on sekä nopeampaa (yhteyspooli ja TLS-istunnot
+/// säilyvät pyyntöjen välillä) että `reqwest`:in suosittelema tapa. Uuden
+/// asiakkaan rakentaminen jokaista pyyntöä varten olisi turhaa työtä.
+static CLIENT: LazyLock<Result<Client, String>> =
+    LazyLock::new(|| Client::builder().build().map_err(|error| error.to_string()));
+
+fn client() -> Result<&'static Client> {
+    CLIENT
+        .as_ref()
+        .map_err(|message| color_eyre::eyre::eyre!("HTTP-asiakkaan luonti epäonnistui: {message}"))
+}
 
 /// Tekee GET-pyynnön ja palauttaa vastauksen. Tulostaa virhetilanteessa
 /// palvelimen vastauksen, kuten alkuperäinen Python-skripti.
@@ -9,11 +24,14 @@ use std::time::Duration;
 /// Käyttää `reqwest`:in asynkronista API:a, joten pyyntö odottaa vain
 /// vastausta eikä se blokkaa asynkronista runtimea.
 async fn get(url: &str, params: &[(&str, &str)], timeout_secs: u64) -> Result<Response> {
-    let client = Client::builder()
+    let response = client()?
+        .get(url)
+        .query(params)
+        // Aikakatkaisu asetetaan pyyntökohtaisesti, koska eri rajapinnoilla
+        // on eri aikarajat.
         .timeout(Duration::from_secs(timeout_secs))
-        .build()?;
-
-    let response = client.get(url).query(params).send().await?;
+        .send()
+        .await?;
 
     if !response.status().is_success() {
         println!("{}", "=".repeat(70));
@@ -24,7 +42,10 @@ async fn get(url: &str, params: &[(&str, &str)], timeout_secs: u64) -> Result<Re
 
         let body = response.text().await.unwrap_or_default();
         println!("\nServer response:");
-        println!("{}", &body[..body.len().min(5000)]);
+        // Katkaistaan merkkien (ei tavujen) mukaan, jotta monitavuiset
+        // merkit eivät voi katketa kesken ja aiheuttaa paniikkia.
+        let preview: String = body.chars().take(5000).collect();
+        println!("{preview}");
         println!("{}", "=".repeat(70));
 
         color_eyre::eyre::bail!("HTTP-pyyntö epäonnistui");

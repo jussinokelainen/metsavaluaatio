@@ -50,21 +50,21 @@ async fn fetch_property_features(
 
 /// Jäsentää MML:n GeoJSON-vastauksen palstalistaksi. Virheelliset palstat
 /// ohitetaan.
-fn parse_property_features(value: serde_json::Value) -> Vec<Feature> {
+fn parse_property_features(mut value: serde_json::Value) -> Vec<Feature> {
+    // Otetaan taulukko omistajuuteen `remove`:lla, jotta jokaista piirrettä
+    // ei tarvitse kloonata ennen jäsentämistä.
     let features = value
-        .get("features")
-        .and_then(|features| features.as_array())
-        .cloned()
-        .unwrap_or_default();
+        .as_object_mut()
+        .and_then(|object| object.remove("features"));
 
-    let mut result = Vec::new();
-    for feature in features {
-        if let Ok(feature) = serde_json::from_value::<Feature>(feature) {
-            result.push(feature);
-        }
-    }
+    let Some(serde_json::Value::Array(features)) = features else {
+        return Vec::new();
+    };
 
-    result
+    features
+        .into_iter()
+        .filter_map(|feature| serde_json::from_value::<Feature>(feature).ok())
+        .collect()
 }
 
 #[cfg(test)]

@@ -178,8 +178,11 @@ async fn run(options: RunOptions) -> Result<()> {
         metsaval::geo_utils::area_m2(&property_geometry) / 10_000.0
     );
 
+    // Haetaan WFS-osoite kerran; molemmat kutsut käyttävät samaa.
+    let wfs_url = metsaval::consts::stand_wfs_url();
+
     // Metsävarakuviot Metsäkeskuksen WFS:stä
-    let stand_layers = metsaval::wfs::get_layers(&metsaval::consts::stand_wfs_url()).await?;
+    let stand_layers = metsaval::wfs::get_layers(&wfs_url).await?;
     println!("Metsävarakerroksia löytyi: {}", stand_layers.len());
 
     let stand_layer = metsaval::wfs::select_stand_layer(&stand_layers)?;
@@ -192,14 +195,9 @@ async fn run(options: RunOptions) -> Result<()> {
     println!("Kiinteistön BBOX:");
     println!("{bbox}");
 
-    let stand_features = metsaval::wfs::get_features_bbox(
-        &metsaval::consts::stand_wfs_url(),
-        &stand_layer,
-        &bbox,
-        EPSG_TM35FIN,
-        10_000,
-    )
-    .await?;
+    let stand_features =
+        metsaval::wfs::get_features_bbox(&wfs_url, &stand_layer, &bbox, EPSG_TM35FIN, 10_000)
+            .await?;
     println!("BBOX-alueelta löytyi: {} kuviota", stand_features.len());
 
     let stands: Vec<Stand> = stand_features
@@ -353,60 +351,20 @@ fn pad_property_id(id: &str) -> Result<String> {
         return Err(eyre!("Virheellinen kiinteistötunnus"));
     }
 
-    let mut padded_parts = Vec::new();
-    // Ensimmäiset 2 on 3 numeroa
-    for &item in parts.iter().take(2) {
-        let mut value = String::from(item);
-        if value.len() > 3 {
-            return Err(eyre!("Virheellinen kiinteistötunnus"));
-        }
-        if value.len() == 3 {
-            padded_parts.push(value);
-            continue;
-        }
-        // Tässä kohtaa pituus on alle 3, pitää lisätä nollat
-        let zero_count = 3 - value.len();
-        for _ in 0..zero_count {
-            let mut tmp = String::from("0");
-            tmp.push_str(&value);
-            value = tmp;
-        }
-        padded_parts.push(value);
-    }
+    // Kaksi ensimmäistä osaa on 3 numeroa, kaksi viimeistä 4.
+    let padded: Vec<String> = parts
+        .iter()
+        .enumerate()
+        .map(|(index, part)| {
+            let width = if index < 2 { 3 } else { 4 };
+            if part.len() > width {
+                return Err(eyre!("Virheellinen kiinteistötunnus"));
+            }
+            Ok(format!("{part:0>width$}"))
+        })
+        .collect::<Result<_>>()?;
 
-    // Viimeiset 2 on 4 numeroa
-    for &item in parts.iter().take(4).skip(2) {
-        let mut value = String::from(item);
-        if value.len() > 4 {
-            return Err(eyre!("Virheellinen kiinteistötunnus"));
-        }
-        if value.len() == 4 {
-            padded_parts.push(value);
-            continue;
-        }
-        // Tässä kohtaa pituus on alle 4, pitää lisätä nollat
-        let zero_count = 4 - value.len();
-        for _ in 0..zero_count {
-            let mut tmp = String::from("0");
-            tmp.push_str(&value);
-            value = tmp;
-        }
-        padded_parts.push(value);
-    }
-    if padded_parts.len() != 4 {
-        println!("{padded_parts:?}");
-        return Err(eyre!("Virhe jäsentäessä kiinteistötunnusta"));
-    }
-
-    let mut out = padded_parts[0].clone();
-    out.push('-');
-    out.push_str(&padded_parts[1]);
-    out.push('-');
-    out.push_str(&padded_parts[2]);
-    out.push('-');
-    out.push_str(&padded_parts[3]);
-
-    Ok(out)
+    Ok(padded.join("-"))
 }
 
 /// Kysyy käyttäjältä halutaanko tehdä xlsx ja kml tiedostot. Syöte luetaan

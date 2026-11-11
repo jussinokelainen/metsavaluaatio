@@ -112,17 +112,20 @@ pub async fn get_features_bbox(
     Ok(extract_features(value))
 }
 
-fn extract_features(value: Value) -> Vec<Feature> {
-    value
-        .get("features")
-        .and_then(|features| features.as_array())
-        .map(|features| {
-            features
-                .iter()
-                .filter_map(|feature| serde_json::from_value::<Feature>(feature.clone()).ok())
-                .collect()
-        })
-        .unwrap_or_default()
+fn extract_features(mut value: Value) -> Vec<Feature> {
+    // Otetaan taulukko omistajuuteen, jotta piirteitä ei tarvitse kloonata.
+    let features = value
+        .as_object_mut()
+        .and_then(|object| object.remove("features"));
+
+    let Some(Value::Array(features)) = features else {
+        return Vec::new();
+    };
+
+    features
+        .into_iter()
+        .filter_map(|feature| serde_json::from_value::<Feature>(feature).ok())
+        .collect()
 }
 
 #[cfg(test)]
