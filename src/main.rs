@@ -2,7 +2,7 @@ use chrono::{Local, SubsecRound};
 use color_eyre::{Result, eyre::eyre};
 use geo::{HasDimensions, MultiPolygon};
 use metsaval::consts::{CYAN, GREEN, RED, RESET, YELLOW};
-use metsaval::consts::{EPSG_TM35FIN, EPSG_WGS84, SMK_STAND_WFS};
+use metsaval::consts::{EPSG_TM35FIN, EPSG_WGS84};
 use metsaval::flagger;
 use metsaval::model::Stand;
 use proj::Proj;
@@ -179,7 +179,7 @@ async fn run(options: RunOptions) -> Result<()> {
     );
 
     // Metsävarakuviot Metsäkeskuksen WFS:stä
-    let stand_layers = metsaval::wfs::get_layers(SMK_STAND_WFS).await?;
+    let stand_layers = metsaval::wfs::get_layers(&metsaval::consts::stand_wfs_url()).await?;
     println!("Metsävarakerroksia löytyi: {}", stand_layers.len());
 
     let stand_layer = metsaval::wfs::select_stand_layer(&stand_layers)?;
@@ -192,9 +192,14 @@ async fn run(options: RunOptions) -> Result<()> {
     println!("Kiinteistön BBOX:");
     println!("{bbox}");
 
-    let stand_features =
-        metsaval::wfs::get_features_bbox(SMK_STAND_WFS, &stand_layer, &bbox, EPSG_TM35FIN, 10_000)
-            .await?;
+    let stand_features = metsaval::wfs::get_features_bbox(
+        &metsaval::consts::stand_wfs_url(),
+        &stand_layer,
+        &bbox,
+        EPSG_TM35FIN,
+        10_000,
+    )
+    .await?;
     println!("BBOX-alueelta löytyi: {} kuviota", stand_features.len());
 
     let stands: Vec<Stand> = stand_features

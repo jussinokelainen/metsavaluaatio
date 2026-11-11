@@ -14,6 +14,29 @@ pub const SMK_HABITAT_WFS: &str = "https://avoin.metsakeskus.fi/rajapinnat/v2/ha
 pub const MUNICIPALITY_ZIP_BASE: &str =
     "https://avoin.metsakeskus.fi/aineistot/Metsavarakuviot/Kunta/MV_";
 
+/// Palauttaa MML:n perusosoitteen. Ympäristömuuttuja `METSAVAL_MML_BASE_URL`
+/// ohittaa oletuksen, mikä mahdollistaa ohjelman testaamisen paikallista
+/// valepalvelinta vasten.
+pub fn mml_base_url() -> String {
+    env_or(MML_BASE_URL, "METSAVAL_MML_BASE_URL")
+}
+
+/// Palauttaa Metsäkeskuksen metsävarojen WFS-osoitteen. Ympäristömuuttuja
+/// `METSAVAL_WFS_URL` ohittaa oletuksen.
+pub fn stand_wfs_url() -> String {
+    env_or(SMK_STAND_WFS, "METSAVAL_WFS_URL")
+}
+
+/// Palauttaa Metsäkeskuksen kunta-ZIP-arkistojen perusosoitteen.
+/// Ympäristömuuttuja `METSAVAL_GPKG_BASE_URL` ohittaa oletuksen.
+pub fn municipality_zip_base() -> String {
+    env_or(MUNICIPALITY_ZIP_BASE, "METSAVAL_GPKG_BASE_URL")
+}
+
+fn env_or(default: &str, key: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
 pub const EPSG_WGS84: &str = "EPSG:4326";
 pub const EPSG_TM35FIN: &str = "EPSG:3067";
 

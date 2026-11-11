@@ -1,4 +1,4 @@
-use crate::consts::MUNICIPALITY_ZIP_BASE;
+use crate::consts::municipality_zip_base;
 use crate::http;
 use crate::model::{StandSummary, TreeStratum};
 use color_eyre::Result;
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 /// Hakee kunnan metsävarakuviot Metsäkeskuksesta ja purkaa GeoPackagen
 /// väliaikaistiedostoon.
 pub async fn download_gpkg(municipality_name: &str, dest_dir: PathBuf) -> Result<PathBuf> {
-    let url = format!("{MUNICIPALITY_ZIP_BASE}{municipality_name}.zip");
+    let url = format!("{}{municipality_name}.zip", municipality_zip_base());
     download_gpkg_from(&url, dest_dir).await
 }
 
@@ -458,6 +458,19 @@ mod tests {
         create_test_database(&path);
 
         let (strata, summaries) = read_trees(&path, &[102]).unwrap();
+        assert_eq!(strata.len(), 1);
+        assert_eq!(strata[0].standid, 102);
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].standid, 102);
+    }
+
+    #[tokio::test]
+    async fn read_trees_async_returns_the_same_data() {
+        let dir = TempDir::new("metsakeskus_async");
+        let path = dir.file("MV_Test.gpkg");
+        create_test_database(&path);
+
+        let (strata, summaries) = read_trees_async(path, vec![102]).await.unwrap();
         assert_eq!(strata.len(), 1);
         assert_eq!(strata[0].standid, 102);
         assert_eq!(summaries.len(), 1);

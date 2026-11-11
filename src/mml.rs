@@ -1,4 +1,4 @@
-use crate::consts::MML_BASE_URL;
+use crate::consts::mml_base_url;
 use crate::http;
 use color_eyre::Result;
 use geojson::Feature;
@@ -24,7 +24,7 @@ pub fn normalize_property_id(property_id: &str) -> Result<String> {
 
 /// Hakee kaikki kiinteistötunnukseen liittyvät palstat MML:stä.
 pub async fn get_property_features(property_id: &str, api_key: &str) -> Result<Vec<Feature>> {
-    let url = format!("{MML_BASE_URL}/collections/PalstanSijaintitiedot/items");
+    let url = format!("{}/collections/PalstanSijaintitiedot/items", mml_base_url());
     fetch_property_features(&url, property_id, api_key).await
 }
 
