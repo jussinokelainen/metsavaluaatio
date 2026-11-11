@@ -161,3 +161,45 @@ pub struct Totals {
     pub costs_eur: f64,
     pub net_eur: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stand_with_cutting(cuttingtype: Option<i64>) -> Stand {
+        Stand {
+            cuttingtype,
+            ..Stand::default()
+        }
+    }
+
+    #[test]
+    fn cutting_is_derived_from_the_cutting_type_code() {
+        assert!(matches!(
+            stand_with_cutting(Some(5)).cutting(),
+            Some(Cutting::Uudistus)
+        ));
+        assert!(matches!(
+            stand_with_cutting(Some(3)).cutting(),
+            Some(Cutting::Harvennus)
+        ));
+        assert!(matches!(
+            stand_with_cutting(Some(2)).cutting(),
+            Some(Cutting::Ensiharvennus)
+        ));
+    }
+
+    #[test]
+    fn missing_or_unknown_cutting_type_has_no_cutting() {
+        assert_eq!(stand_with_cutting(None).cutting(), None);
+        assert_eq!(stand_with_cutting(Some(99)).cutting(), None);
+    }
+
+    #[test]
+    fn totals_default_to_zero() {
+        let totals = Totals::default();
+        assert_eq!(totals.stand_count, 0);
+        assert_eq!(totals.area_ha, 0.0);
+        assert_eq!(totals.net_eur, 0.0);
+    }
+}

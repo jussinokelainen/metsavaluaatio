@@ -96,6 +96,21 @@ Selaimessa klikkaa 'Create new map' -> Vasemalla olevassa ikkunassa 'Untitled la
 
 Klikkaa lisätyn tason yläpuolella 'Share' ja nimeä kartta -> valtuuta kaikki kenellä on linkki avaamaan kartta -> kopioi linkki alareunasta
 
+Testit
+------
+
+Projektin testit ajetaan komennolla:
+
+```bash
+cargo test
+```
+
+Testit kattavat koko laskentaketjun: kiinteistötunnien jäsennyksen, GeoJSON- ja
+koordinaattikäsittelyn, Metsäkeskuksen GeoPackage-lukemisen, arvon ja kulujen
+laskennan, Excel- ja KML-tiedostojen sekä rajapintojen vastauksten käsittelyn.
+Verkkoyhteyttä vaativat funktiot (`mml`, `wfs`, `metsakeskus::download_gpkg`)
+eivät ole testattuja; `http`-moduuli testataan paikallisella HTTP-palvelimella.
+
 Ohjelman poistaminen
 --------------------
 

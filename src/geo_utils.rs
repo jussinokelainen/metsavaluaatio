@@ -231,4 +231,101 @@ mod tests {
         let feature = serde_json::from_value(feature).unwrap();
         assert!(clip_stand(&feature, &square(0.0, 10.0)).is_none());
     }
+
+    #[test]
+    fn feature_to_multipolygon_accepts_polygons_and_multipolygons() {
+        let polygon = json!({
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]]]
+            }
+        });
+        let polygon: geojson::Feature = serde_json::from_value(polygon).unwrap();
+        assert_close(area_m2(&feature_to_multipolygon(&polygon).unwrap()), 0.5);
+
+        let multi = json!({
+            "type": "Feature",
+            "geometry": {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]]],
+                    [[[5.0, 5.0], [6.0, 5.0], [6.0, 6.0], [5.0, 5.0]]]
+                ]
+            }
+        });
+        let multi: geojson::Feature = serde_json::from_value(multi).unwrap();
+        assert_close(area_m2(&feature_to_multipolygon(&multi).unwrap()), 1.0);
+    }
+
+    #[test]
+    fn feature_to_multipolygon_rejects_missing_and_foreign_geometries() {
+        let point = json!({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [1.0, 2.0]}
+        });
+        let point: geojson::Feature = serde_json::from_value(point).unwrap();
+        assert!(feature_to_multipolygon(&point).is_none());
+
+        let empty = geojson::Feature::default();
+        assert!(feature_to_multipolygon(&empty).is_none());
+
+        let broken = json!({
+            "type": "Feature",
+            "geometry": {"type": "GeometryCollection", "geometries": []}
+        });
+        let broken: geojson::Feature = serde_json::from_value(broken).unwrap();
+        assert!(feature_to_multipolygon(&broken).is_none());
+    }
+
+    #[test]
+    fn union_all_merges_overlapping_polygons() {
+        let overlapping = union_all(&[square(0.0, 10.0), square(5.0, 10.0)]);
+        // Kaksi 10x10 neliötä joissa 5x5 yhteinen ala: 100 + 100 - 25
+        assert_close(area_m2(&overlapping), 175.0);
+
+        let disjoint = union_all(&[square(0.0, 10.0), square(20.0, 10.0)]);
+        assert_close(area_m2(&disjoint), 200.0);
+
+        assert_eq!(area_m2(&union_all(&[])), 0.0);
+    }
+
+    #[test]
+    fn bounds_of_an_empty_geometry_are_none() {
+        assert_eq!(bounds(&MultiPolygon::new(vec![])), None);
+    }
+
+    #[test]
+    fn transform_round_trips_between_wgs84_and_tm35fin() {
+        use crate::consts::{EPSG_TM35FIN, EPSG_WGS84};
+
+        let to_wgs84 = Proj::new_known_crs(EPSG_TM35FIN, EPSG_WGS84, None).unwrap();
+        let to_tm35 = Proj::new_known_crs(EPSG_WGS84, EPSG_TM35FIN, None).unwrap();
+
+        // Neliö ETRS-TM35FIN koordinaatistossa (Suomen alueella)
+        let (x, y, size) = (385_000.0, 6_700_000.0, 100.0);
+        let original = MultiPolygon::new(vec![Polygon::new(
+            LineString::from(vec![
+                (x, y),
+                (x + size, y),
+                (x + size, y + size),
+                (x, y + size),
+                (x, y),
+            ]),
+            vec![],
+        )]);
+
+        let wgs84 = transform(&original, &to_wgs84);
+        let (min_x, min_y, max_x, max_y) = bounds(&wgs84).unwrap();
+        // Asteissa
+        assert!(min_x > 20.0 && max_x < 32.0, "lon {min_x}..{max_x}");
+        assert!(min_y > 59.0 && max_y < 71.0, "lat {min_y}..{max_y}");
+
+        let back = transform(&wgs84, &to_tm35);
+        let (bmin_x, bmin_y, bmax_x, bmax_y) = bounds(&back).unwrap();
+        assert!((bmin_x - x).abs() < 1e-6);
+        assert!((bmin_y - y).abs() < 1e-6);
+        assert!((bmax_x - (x + size)).abs() < 1e-6);
+        assert!((bmax_y - (y + size)).abs() < 1e-6);
+    }
 }

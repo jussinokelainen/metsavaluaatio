@@ -351,6 +351,67 @@ mod tests {
     }
 
     #[test]
+    fn unknown_short_flag_is_an_error() {
+        assert!(parse_args(cli(), Some(&["-z"])).is_err());
+        assert!(parse_args(cli(), Some(&["-hz"])).is_err());
+    }
+
+    #[test]
+    fn value_flag_with_empty_equal_value_is_accepted() {
+        let parsed = parse_args(cli(), Some(&["--bar="])).unwrap();
+        assert_eq!(
+            parsed.value_flags,
+            Some(vec![("bar".to_string(), String::new())])
+        );
+    }
+
+    #[test]
+    fn boolean_flag_with_value_is_an_error() {
+        assert!(parse_args(cli(), Some(&["--help=1"])).is_err());
+        assert!(parse_args(cli(), Some(&["-h=1"])).is_err());
+    }
+
+    #[test]
+    fn optional_flag_followed_by_another_flag_is_a_boolean() {
+        let parsed = parse_args(cli(), Some(&["--baz", "--foo"])).unwrap();
+        assert_eq!(
+            parsed.flags,
+            Some(vec!["baz".to_string(), "foo".to_string()])
+        );
+        assert!(parsed.value_flags.is_none());
+    }
+
+    #[test]
+    fn optional_flag_followed_by_a_value_flag_is_a_boolean() {
+        let parsed = parse_args(cli(), Some(&["--baz", "--bar", "x"])).unwrap();
+        assert_eq!(parsed.flags, Some(vec!["baz".to_string()]));
+        assert_eq!(
+            parsed.value_flags,
+            Some(vec![("bar".to_string(), "x".to_string())])
+        );
+    }
+
+    #[test]
+    fn plain_strings_are_kept_in_order() {
+        let parsed = parse_args(cli(), Some(&["ensimmäinen", "--foo", "toinen"])).unwrap();
+        assert_eq!(
+            parsed.normal_str,
+            Some(vec!["ensimmäinen".to_string(), "toinen".to_string()])
+        );
+        assert_eq!(parsed.flags, Some(vec!["foo".to_string()]));
+    }
+
+    #[test]
+    fn value_flag_value_is_not_collected_as_a_normal_string() {
+        let parsed = parse_args(cli(), Some(&["--bar", "arvo", "teksti"])).unwrap();
+        assert_eq!(
+            parsed.value_flags,
+            Some(vec![("bar".to_string(), "arvo".to_string())])
+        );
+        assert_eq!(parsed.normal_str, Some(vec!["teksti".to_string()]));
+    }
+
+    #[test]
     fn everything_mixed() {
         let parsed = parse_args(
             cli(),
@@ -369,5 +430,40 @@ mod tests {
             ])
         );
         assert_eq!(parsed.normal_str, Some(vec!["hello".to_string()]))
+    }
+
+    #[test]
+    fn arguments_are_read_from_the_environment_when_no_custom_args_are_given() {
+        // Testaustyökalu saa omat argumenttinsa; tyhjä Flagset hyväksyy kaiken
+        let parsed = parse_args(Flagset::new_empty(), None);
+        assert!(parsed.is_ok());
+    }
+
+    #[test]
+    fn a_string_with_an_equals_sign_is_not_a_flag_without_a_dash_prefix() {
+        let parsed = parse_args(Flagset::new_empty(), Some(&["teksti=x"])).unwrap();
+        assert_eq!(parsed.normal_str, Some(vec!["teksti=x".to_string()]));
+        assert!(parsed.flags.is_none());
+        assert!(parsed.value_flags.is_none());
+    }
+
+    #[test]
+    fn requires_value_skips_optional_flags_when_none_are_declared() {
+        let flags = Flagset {
+            flags: None,
+            value_flags: Some(vec!["bar"]),
+            opt_flags: None,
+        };
+        // Tuntematon lippu aiheuttaa virheen, mutta valinnaisia lippuja ei
+        // ole ilmoitettu joten niitä ei tarkisteta
+        assert!(parse_args(flags, Some(&["--muu"])).is_err());
+    }
+
+    #[test]
+    fn multibyte_characters_in_a_dash_cluster_do_not_break_the_parsing() {
+        // Merkkien määrä (merkkeinä) ja '='-merkin sijainti (tavuina) eroavat
+        // toisistaan, jolloin osa merkeistä jää pois
+        let parsed = parse_args(Flagset::new_empty(), Some(&["-ääää=x"]));
+        assert!(parsed.is_ok());
     }
 }

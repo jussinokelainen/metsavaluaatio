@@ -808,6 +808,44 @@ mod tests {
         assert_eq!(grouped_precise(1000.0, 2), "1 000,00");
     }
 
+    #[test]
+    fn grouped_precise_without_decimals_omits_the_fraction() {
+        assert_eq!(grouped_precise(1234.0, 0), "1 234");
+        assert_eq!(grouped_precise(1000.0, 0), "1 000");
+    }
+
+    #[test]
+    fn grouped_precise_keeps_the_minus_sign_of_negative_values() {
+        assert_eq!(grouped_precise(-1234567.0, 0), "-1 234 567");
+        assert_eq!(grouped_precise(-1234.5, 2), "-1 234,50");
+    }
+
+    #[test]
+    fn optional_comparators_handle_missing_values() {
+        // "tavallinen" järjestys: puuttuva on pienempi
+        assert_eq!(cmp_opt_i64(None, None), Ordering::Equal);
+        assert_eq!(cmp_opt_i64(None, Some(1)), Ordering::Less);
+        assert_eq!(cmp_opt_i64(Some(1), None), Ordering::Greater);
+        assert_eq!(cmp_opt_i64(Some(1), Some(2)), Ordering::Less);
+        assert_eq!(cmp_opt_i64(Some(2), Some(1)), Ordering::Greater);
+
+        // "_last"-järjestys: puuttuva tulee viimeiseksi
+        assert_eq!(cmp_opt_i64_last(None, None), Ordering::Equal);
+        assert_eq!(cmp_opt_i64_last(None, Some(1)), Ordering::Greater);
+        assert_eq!(cmp_opt_i64_last(Some(1), None), Ordering::Less);
+        assert_eq!(cmp_opt_i64_last(Some(1), Some(1)), Ordering::Equal);
+
+        assert_eq!(cmp_opt_f64(None, None), Ordering::Equal);
+        assert_eq!(cmp_opt_f64(None, Some(1.0)), Ordering::Less);
+        assert_eq!(cmp_opt_f64(Some(1.0), None), Ordering::Greater);
+        assert_eq!(cmp_opt_f64(Some(1.0), Some(2.0)), Ordering::Less);
+
+        assert_eq!(cmp_opt_f64_last(None, None), Ordering::Equal);
+        assert_eq!(cmp_opt_f64_last(None, Some(1.0)), Ordering::Greater);
+        assert_eq!(cmp_opt_f64_last(Some(1.0), None), Ordering::Less);
+        assert_eq!(cmp_opt_f64_last(Some(2.0), Some(2.0)), Ordering::Equal);
+    }
+
     fn stand_value() -> StandValue {
         StandValue {
             area: None,
@@ -890,5 +928,1097 @@ mod tests {
                 + a * COST_RATES.taimet_siementen_uudistus;
             assert_eq!(res, want)
         }
+    }
+
+    #[test]
+    fn costs_without_a_harvest_proposal_are_zero() {
+        assert_eq!(calculate_costs(Some(1.0), 16.0, 10.0, None), 0.0);
+    }
+
+    /// Yhdistää puuttuvan hakkuuehdotuksen ja annetun ehdotuksen laskemaan
+    /// saman arvon: hakkuuehdotus vain valitaan käsittelykykyysrajojen perusteella.
+    fn assert_matches_cutting(summary: &SpeciesSummary, expected: Cutting) {
+        let explicit = SpeciesSummary {
+            cutting: Some(expected),
+            ..summary.clone()
+        };
+        let inferred = calculate_value(summary);
+        let direct = calculate_value(&explicit);
+        assert_close(inferred, direct);
+        assert!(
+            inferred > 0.0,
+            "hakkuutyypin mukaan laskettu arvo: {inferred}"
+        );
+    }
+
+    #[test]
+    fn missing_harvest_proposal_uses_manty_limits() {
+        // Päätehakkuu: ikä ylittää 90 ja läpimitta ylittää 25-3 = 22 cm
+        let final_felling = SpeciesSummary {
+            species: Species::Manty,
+            cutting: None,
+            age: Some(95.0),
+            meandiameter: Some(23.0),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_matches_cutting(&final_felling, Cutting::Uudistus);
+
+        // Harvennus: ikä, läpimitta ja korkeus täyttävät harvennusrajan mutta
+        // eivät päätehakkuun rajat
+        let thinning = SpeciesSummary {
+            species: Species::Manty,
+            cutting: None,
+            age: Some(40.0),
+            meandiameter: Some(20.0),
+            meanheight: Some(12.0),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_matches_cutting(&thinning, Cutting::Harvennus);
+
+        // Molemmat rajat alittava mänty ei tuota arvoa
+        let young = SpeciesSummary {
+            age: Some(20.0),
+            meandiameter: Some(15.0),
+            meanheight: Some(10.0),
+            ..thinning
+        };
+        assert_eq!(calculate_value(&young), 0.0);
+    }
+
+    #[test]
+    fn missing_harvest_proposal_uses_koivu_limits() {
+        // Päätehakkuu: ikä ylittää 60 ja läpimitta ylittää 27-3 = 24 cm
+        let final_felling = SpeciesSummary {
+            species: Species::Koivu,
+            cutting: None,
+            age: Some(65.0),
+            meandiameter: Some(25.0),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_matches_cutting(&final_felling, Cutting::Uudistus);
+
+        // Harvennus täyttää omat rajansa ilman päätehakkuun rajoja
+        let thinning = SpeciesSummary {
+            species: Species::Koivu,
+            cutting: None,
+            age: Some(30.0),
+            meandiameter: Some(20.0),
+            meanheight: Some(15.0),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_matches_cutting(&thinning, Cutting::Harvennus);
+
+        // Liian matala koivu ei täytä harvennusrajoja
+        let too_short = SpeciesSummary {
+            meanheight: Some(10.0),
+            ..thinning
+        };
+        assert_eq!(calculate_value(&too_short), 0.0);
+    }
+
+    #[test]
+    fn stand_value_growth_pct_is_none_without_volume() {
+        let without_volume = SpeciesSummary {
+            volume: 0.0,
+            volumegrowth: 5.0,
+            ..row()
+        };
+        let with_volume = SpeciesSummary {
+            standid: 2,
+            volume: 100.0,
+            volumegrowth: 10.0,
+            ..row()
+        };
+
+        let values = build_stand_values(&[without_volume, with_volume], &[], &[stand(1), stand(2)]);
+
+        let none_pct = values
+            .iter()
+            .find(|value| value.standid == 1)
+            .expect("kuvio 1 löytyi");
+        assert_eq!(none_pct.growth_pct, None);
+
+        let some_pct = values
+            .iter()
+            .find(|value| value.standid == 2)
+            .expect("kuvio 2 löytyi");
+        assert_eq!(some_pct.growth_pct, Some(10.0));
+    }
+
+    // -----------------------------------------------------------------------
+    // Apu-funktiot testidatalle
+    // -----------------------------------------------------------------------
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    fn stand(standid: i64) -> Stand {
+        Stand {
+            standid: Some(standid),
+            ..Stand::default()
+        }
+    }
+
+    fn stand_summary(standid: i64) -> StandSummary {
+        StandSummary {
+            standid,
+            meanage: None,
+            basalarea: None,
+            stemcount: None,
+            meandiameter: None,
+            meanheight: None,
+            volume: None,
+            sawlogvolume: None,
+            pulpwoodvolume: None,
+            volumegrowth: None,
+            main_species: None,
+            fertility_class: None,
+            main_group: None,
+            soil_type: None,
+        }
+    }
+
+    /// Kuvio jossa on kaikki puustotiedot täytettynä
+    fn filled_stratum(standid: i64, treespecies: i64) -> TreeStratum {
+        TreeStratum {
+            standid,
+            treespecies,
+            age: Some(50.0),
+            basalarea: Some(25.0),
+            stemcount: Some(1000.0),
+            meandiameter: Some(20.0),
+            meanheight: Some(15.0),
+            volume: Some(100.0),
+            sawlogpercent: Some(40.0),
+            sawlogvolume: Some(40.0),
+            pulpwoodvolume: Some(60.0),
+            volumegrowth: Some(10.0),
+            stembiomass: Some(200.0),
+            stumpbiomass: Some(30.0),
+            branchbiomass: Some(40.0),
+            leafbiomass: Some(10.0),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // build_species_summary
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn species_summary_merges_strata_of_the_same_stand_species_and_age() {
+        let stands = vec![Stand {
+            standid: Some(1),
+            standnumber: Some(7),
+            cuttingtype: Some(5),
+            cuttingproposalyear: Some(2030),
+            area: Some(2.0),
+            ..Stand::default()
+        }];
+
+        let first = filled_stratum(1, 2);
+        let mut second = filled_stratum(1, 2);
+        second.volume = Some(50.0);
+        second.sawlogvolume = Some(20.0);
+        second.pulpwoodvolume = Some(30.0);
+        second.volumegrowth = Some(5.0);
+        second.meandiameter = Some(22.0);
+        second.meanheight = Some(17.0);
+        second.stemcount = Some(800.0);
+
+        let summaries = build_species_summary(&[first.clone(), second], &stands).unwrap();
+        assert_eq!(summaries.len(), 1);
+
+        let summary = &summaries[0];
+        assert_eq!(summary.standid, 1);
+        assert_eq!(summary.standnumber, Some(7));
+        assert_eq!(summary.species, Species::Kuusi);
+        assert!(matches!(summary.cutting, Some(Cutting::Uudistus)));
+        assert_eq!(summary.cuttingproposalyear, Some(2030));
+        assert_eq!(summary.age, Some(50.0));
+        assert_eq!(summary.area, Some(2.0));
+        assert_close(summary.volume, 150.0);
+        assert_close(summary.sawlogvolume, 60.0);
+        assert_close(summary.pulpwoodvolume, 90.0);
+        assert_close(summary.volumegrowth, 15.0);
+        assert_close(summary.stemcount, 1800.0);
+        assert_close(summary.meandiameter.unwrap(), 21.0);
+        assert_close(summary.meanheight.unwrap(), 16.0);
+        assert_close(summary.growth_pct.unwrap(), 10.0);
+        // Arvo lasketaan hakkuuehdotuksen (uudistus) mukaan
+        assert!(summary.value_eur > 0.0);
+
+        // Sama data yhtenä rivinä on identtinen kahden rivin kanssa
+        let single = build_species_summary(&[first], &stands).unwrap();
+        assert_eq!(single.len(), 1);
+        assert_close(single[0].volume, 100.0);
+    }
+
+    #[test]
+    fn species_summary_ignores_strata_without_a_matching_stand() {
+        let stands = vec![stand(1)];
+        let summaries = build_species_summary(&[filled_stratum(2, 1)], &stands).unwrap();
+        assert!(summaries.is_empty());
+    }
+
+    #[test]
+    fn species_summary_keeps_strata_with_different_ages_apart() {
+        let stands = vec![stand(1)];
+        let mut young = filled_stratum(1, 2);
+        young.age = Some(40.0);
+        let mut old = filled_stratum(1, 2);
+        old.age = Some(60.0);
+
+        let summaries = build_species_summary(&[young, old], &stands).unwrap();
+        assert_eq!(summaries.len(), 2);
+        let ages: Vec<Option<f64>> = summaries.iter().map(|row| row.age).collect();
+        assert_eq!(ages, vec![Some(40.0), Some(60.0)]);
+    }
+
+    #[test]
+    fn species_summary_is_ordered_by_standnumber_then_species() {
+        let stands = vec![
+            Stand {
+                standid: Some(1),
+                ..Stand::default()
+            },
+            Stand {
+                standid: Some(2),
+                standnumber: Some(3),
+                ..Stand::default()
+            },
+            Stand {
+                standid: Some(3),
+                standnumber: Some(3),
+                ..Stand::default()
+            },
+        ];
+
+        let strata = vec![
+            filled_stratum(1, 29), // Koivu, ei kuvionumeroa -> viimeiseksi
+            filled_stratum(2, 1),  // Mänty, kuvio 3
+            filled_stratum(3, 1),  // Mänty, kuvio 3
+            filled_stratum(3, 2),  // Kuusi, kuvio 3
+        ];
+
+        let summaries = build_species_summary(&strata, &stands).unwrap();
+        let species: Vec<Species> = summaries.iter().map(|row| row.species).collect();
+        assert_eq!(
+            species,
+            vec![
+                Species::Kuusi,
+                Species::Manty,
+                Species::Manty,
+                Species::Koivu
+            ]
+        );
+        let standnumbers: Vec<Option<i64>> = summaries.iter().map(|row| row.standnumber).collect();
+        assert_eq!(
+            standnumbers,
+            vec![Some(3), Some(3), Some(3), None],
+            "puuttuva kuvionumero järjestetään viimeiseksi"
+        );
+    }
+
+    #[test]
+    fn species_summary_growth_percent_is_none_without_volume() {
+        let stands = vec![stand(1)];
+        let strata = vec![filled_stratum(1, 2)];
+        let summaries = build_species_summary(&strata, &stands).unwrap();
+        // Tässä on tilavuutta, joten prosentti lasketaan
+        assert!(summaries[0].growth_pct.is_some());
+
+        let mut empty = filled_stratum(1, 2);
+        empty.volume = None;
+        empty.sawlogvolume = None;
+        empty.pulpwoodvolume = None;
+        empty.volumegrowth = None;
+        let summaries = build_species_summary(&[empty], &stands).unwrap();
+        assert_eq!(summaries[0].growth_pct, None);
+    }
+
+    #[test]
+    fn species_summary_falls_back_to_growth_percent_without_dimensions() {
+        let stands = vec![stand(1)];
+        let mut stratum = filled_stratum(1, 2);
+        stratum.meandiameter = None;
+        stratum.meanheight = None;
+
+        let summaries = build_species_summary(&[stratum], &stands).unwrap();
+        let summary = &summaries[0];
+        assert!(summary.value_growth_pct.is_some());
+        assert_close(
+            summary.value_growth_pct.unwrap(),
+            summary.growth_pct.unwrap(),
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // calculate_value
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn uudistus_value_is_calculated_from_sawlog_and_pulpwood_prices() {
+        let summary = SpeciesSummary {
+            cutting: Some(Cutting::Uudistus),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&summary), 1034.925);
+    }
+
+    #[test]
+    fn harvennus_value_is_calculated_from_prices() {
+        let summary = SpeciesSummary {
+            cutting: Some(Cutting::Harvennus),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        // Huomaa: myös kuitu lasketaan tukkihinnalla
+        assert_close(calculate_value(&summary), 481.81);
+    }
+
+    #[test]
+    fn missing_harvest_proposal_uses_value_limits() {
+        // Kuusi: päätehakkuu kun läpimitta ylittää 27 cm
+        let final_felling = SpeciesSummary {
+            species: Species::Kuusi,
+            cutting: None,
+            meandiameter: Some(27.0),
+            age: Some(40.0),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&final_felling), 1075.875);
+
+        // ...tai kun ikä ja läpimitta ylittävät rajat
+        let old_tree = SpeciesSummary {
+            species: Species::Kuusi,
+            cutting: None,
+            meandiameter: Some(24.0),
+            age: Some(80.0),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&old_tree), 1075.875);
+    }
+
+    #[test]
+    fn missing_harvest_proposal_falls_back_to_thinning() {
+        let thinning = SpeciesSummary {
+            species: Species::Kuusi,
+            cutting: None,
+            meandiameter: Some(20.0),
+            meanheight: Some(15.0),
+            age: Some(50.0),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&thinning), 502.11);
+
+        // Liian matala puu ei täytä harvennusrajoja
+        let too_short = SpeciesSummary {
+            meanheight: Some(10.0),
+            ..thinning
+        };
+        assert_eq!(calculate_value(&too_short), 0.0);
+    }
+
+    #[test]
+    fn each_species_uses_its_own_price_list() {
+        let manty = SpeciesSummary {
+            species: Species::Manty,
+            cutting: Some(Cutting::Uudistus),
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_close(calculate_value(&manty), 1034.925);
+
+        let kuusi = SpeciesSummary {
+            species: Species::Kuusi,
+            ..manty.clone()
+        };
+        assert_close(calculate_value(&kuusi), 1075.875);
+
+        let koivu = SpeciesSummary {
+            species: Species::Koivu,
+            ..manty
+        };
+        assert_close(calculate_value(&koivu), 853.95);
+    }
+
+    #[test]
+    fn unknown_species_is_worthless_without_a_harvest_proposal() {
+        let summary = SpeciesSummary {
+            species: Species::Muu,
+            cutting: None,
+            meandiameter: Some(50.0),
+            meanheight: Some(30.0),
+            age: Some(200.0),
+            sawlogvolume: 100.0,
+            pulpwoodvolume: 100.0,
+            ..row()
+        };
+        assert_eq!(calculate_value(&summary), 0.0);
+    }
+
+    #[test]
+    fn missing_area_means_no_value() {
+        let summary = SpeciesSummary {
+            cutting: Some(Cutting::Uudistus),
+            area: None,
+            sawlogvolume: 10.0,
+            pulpwoodvolume: 20.0,
+            ..row()
+        };
+        assert_eq!(calculate_value(&summary), 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // tree_net_gain / calculate_value_growth
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tree_net_gain_needs_both_dimensions() {
+        assert_eq!(
+            tree_net_gain(
+                Species::Kuusi,
+                None,
+                Some(15.0),
+                1000.0,
+                40.0,
+                60.0,
+                5.0,
+                None
+            ),
+            None
+        );
+        assert_eq!(
+            tree_net_gain(
+                Species::Kuusi,
+                Some(20.0),
+                None,
+                1000.0,
+                40.0,
+                60.0,
+                5.0,
+                None
+            ),
+            None
+        );
+        assert_eq!(
+            tree_net_gain(
+                Species::Muu,
+                Some(20.0),
+                Some(15.0),
+                1000.0,
+                40.0,
+                60.0,
+                5.0,
+                None
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn tree_net_gain_is_zero_without_volumegrowth() {
+        let gain = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(15.0),
+            1000.0,
+            40.0,
+            60.0,
+            0.0,
+            None,
+        );
+        assert_close(gain.unwrap(), 0.0);
+    }
+
+    #[test]
+    fn tree_net_gain_grows_with_volumegrowth() {
+        let small = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(15.0),
+            1000.0,
+            40.0,
+            60.0,
+            5.0,
+            None,
+        )
+        .unwrap();
+        let large = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(15.0),
+            1000.0,
+            40.0,
+            60.0,
+            20.0,
+            None,
+        )
+        .unwrap();
+
+        assert!(small > 0.0, "kasvava puu tuottaa arvokasvua: {small}");
+        assert!(large > small, "{large} pitäisi olla suurempi kuin {small}");
+    }
+
+    #[test]
+    fn tree_net_gain_uses_the_given_q_instead_of_the_default() {
+        let default_q = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(15.0),
+            1000.0,
+            40.0,
+            60.0,
+            10.0,
+            None,
+        )
+        .unwrap();
+        let custom_q = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(15.0),
+            1000.0,
+            40.0,
+            60.0,
+            10.0,
+            Some(1.0),
+        )
+        .unwrap();
+        assert_ne!(default_q, custom_q);
+    }
+
+    #[test]
+    fn tree_net_gain_ignores_height_below_twelve_metres() {
+        // Alle 12 m korkeuskorjauskerroin on 0, jolloin tulos riippuu vain
+        // kasvuprosentista
+        let short = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(10.0),
+            1000.0,
+            40.0,
+            60.0,
+            5.0,
+            None,
+        )
+        .unwrap();
+        assert!(short > 0.0, "tulos: {short}");
+
+        let no_growth = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(10.0),
+            1000.0,
+            40.0,
+            60.0,
+            0.0,
+            None,
+        )
+        .unwrap();
+        assert_close(no_growth, 0.0);
+    }
+
+    #[test]
+    fn tree_net_gain_keeps_a_tiny_sawlog_share_unchanged() {
+        // t0 = 0.1 / 100.1 < 0.005, jolloin tulosarvo t1 = t0 eikä kasvua
+        // skaalata korkeudella
+        let gain = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(15.0),
+            1000.0,
+            0.1,
+            100.0,
+            5.0,
+            None,
+        )
+        .unwrap();
+        // Kun t1 == t0, nettokasvu on täsmälleen kasvusuhde g
+        assert_close(gain, 5.0 / 100.1);
+    }
+
+    #[test]
+    fn value_growth_is_a_percentage_of_the_net_gain() {
+        let mut summary = row();
+        summary.species = Species::Kuusi;
+        summary.volume = 100.0;
+        summary.sawlogvolume = 40.0;
+        summary.pulpwoodvolume = 60.0;
+        summary.volumegrowth = 10.0;
+        summary.meandiameter = Some(20.0);
+        summary.meanheight = Some(15.0);
+        summary.stemcount = 1000.0;
+
+        let growth = calculate_value_growth(&summary).unwrap();
+        assert!(growth.is_finite());
+        assert!(growth > 0.0);
+
+        let direct = tree_net_gain(
+            Species::Kuusi,
+            Some(20.0),
+            Some(15.0),
+            1000.0,
+            40.0,
+            60.0,
+            10.0,
+            None,
+        )
+        .unwrap();
+        assert_close(growth, direct * 100.0);
+    }
+
+    #[test]
+    fn value_growth_is_none_without_dimensions() {
+        let mut summary = row();
+        summary.species = Species::Kuusi;
+        summary.volume = 100.0;
+        summary.sawlogvolume = 40.0;
+        summary.pulpwoodvolume = 60.0;
+        summary.volumegrowth = 10.0;
+        summary.meandiameter = None;
+        summary.meanheight = None;
+
+        assert_eq!(calculate_value_growth(&summary), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // build_timber_values
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn timber_values_have_one_row_per_species_and_timber_type() {
+        let mut first = row();
+        first.standid = 1;
+        first.sawlogvolume = 40.0;
+        first.pulpwoodvolume = 60.0;
+        let mut second = row();
+        second.standid = 2;
+        second.species = Species::Kuusi;
+        second.sawlogvolume = 10.0;
+        second.pulpwoodvolume = 30.0;
+
+        let values = build_timber_values(&[first, second]);
+        assert_eq!(values.len(), 4);
+
+        // Ensin kaikki tukkirivit, sitten kuiturivit
+        assert!(
+            values[..2]
+                .iter()
+                .all(|row| row.timber_type == TimberType::Tukki)
+        );
+        assert_close(values[0].volume, 40.0);
+        assert_close(values[1].volume, 10.0);
+
+        assert!(
+            values[2..]
+                .iter()
+                .all(|row| row.timber_type == TimberType::Kuitu)
+        );
+        assert_close(values[2].volume, 60.0);
+        assert_close(values[3].volume, 30.0);
+
+        assert_eq!(values[0].species, Species::Manty);
+        assert_eq!(values[1].species, Species::Kuusi);
+        assert_eq!(values[2].species, Species::Manty);
+        assert_eq!(values[3].species, Species::Kuusi);
+    }
+
+    #[test]
+    fn timber_values_keep_stand_info() {
+        let mut summary = row();
+        summary.standid = 42;
+        summary.standnumber = Some(7);
+        summary.cutting = Some(Cutting::Harvennus);
+        summary.cuttingproposalyear = Some(2031);
+        summary.age = Some(55.0);
+
+        let values = build_timber_values(&[summary]);
+        for value in values {
+            assert_eq!(value.standid, 42);
+            assert_eq!(value.standnumber, Some(7));
+            assert!(matches!(value.cutting, Some(Cutting::Harvennus)));
+            assert_eq!(value.cuttingproposalyear, Some(2031));
+            assert_eq!(value.age, Some(55.0));
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // build_stand_values
+    // -----------------------------------------------------------------------
+
+    fn species_row(standid: i64, species: Species) -> SpeciesSummary {
+        SpeciesSummary {
+            standid,
+            standnumber: Some(7),
+            species,
+            cutting: Some(Cutting::Uudistus),
+            cuttingproposalyear: Some(2030),
+            age: Some(50.0),
+            stemcount: 1000.0,
+            meandiameter: Some(20.0),
+            meanheight: Some(15.0),
+            area: Some(2.0),
+            volume: 100.0,
+            sawlogvolume: 40.0,
+            pulpwoodvolume: 60.0,
+            volumegrowth: 10.0,
+            growth_pct: Some(10.0),
+            value_growth_pct: Some(12.0),
+            value_eur: 500.0,
+        }
+    }
+
+    #[test]
+    fn stand_values_aggregate_species_rows_of_one_stand() {
+        let mut kuusi = species_row(1, Species::Kuusi);
+        kuusi.sawlogvolume = 40.0;
+        kuusi.pulpwoodvolume = 60.0;
+        kuusi.volume = 100.0;
+        kuusi.volumegrowth = 10.0;
+        kuusi.value_eur = 500.0;
+
+        let mut manty = species_row(1, Species::Manty);
+        manty.sawlogvolume = 20.0;
+        manty.pulpwoodvolume = 30.0;
+        manty.volume = 50.0;
+        manty.volumegrowth = 5.0;
+        manty.value_eur = 300.0;
+
+        let stands = vec![Stand {
+            standid: Some(1),
+            standnumber: Some(7),
+            cuttingtype: Some(5),
+            cuttingproposalyear: Some(2030),
+            area: Some(2.0),
+            ..Stand::default()
+        }];
+
+        let mut summary = stand_summary(1);
+        summary.meanage = Some(55.0);
+        summary.stemcount = Some(1200.0);
+        summary.meandiameter = Some(22.0);
+        summary.meanheight = Some(16.0);
+        summary.main_species = Some(2);
+        summary.fertility_class = Some(1);
+        summary.main_group = Some(2);
+        summary.soil_type = Some(24);
+
+        let values = build_stand_values(&[kuusi, manty], &[summary], &stands);
+        assert_eq!(values.len(), 1);
+
+        let value = &values[0];
+        assert_eq!(value.standid, 1);
+        assert_eq!(value.standnumber, Some(7));
+        assert!(matches!(value.cutting, Some(Cutting::Uudistus)));
+        assert_eq!(value.cuttingproposalyear, Some(2030));
+        assert_close(value.volume, 150.0);
+        assert_close(value.sawlogvolume, 60.0);
+        assert_close(value.pulpwoodvolume, 90.0);
+        assert_close(value.volumegrowth, 15.0);
+        assert_close(value.growth_pct.unwrap(), 10.0);
+        assert_eq!(value.area, Some(2.0));
+        assert_close(value.income_eur, 800.0);
+
+        // Kulut: 2 ha * (0.75*(90+60)) m³ * 0.5 €/m³ + 2 ha * (720 + 1120) €/ha
+        assert_close(value.costs_eur, 3792.5);
+        assert_close(value.net_eur, 800.0 - 3792.5);
+
+        // Kuvion perustiedot tulevat StandSummarysta
+        assert_eq!(value.meanage, Some(55.0));
+        assert_eq!(value.stemcount, Some(1200.0));
+        assert_eq!(value.meandiameter, Some(22.0));
+        assert_eq!(value.meanheight, Some(16.0));
+        assert_eq!(value.main_species, Some(2));
+        assert!(matches!(value.fertility_class, FertilityClass::Lehto));
+        assert!(matches!(value.main_group, MainGroup::KituMaa));
+        assert!(matches!(value.soil_type, SoilType::Savimaa));
+    }
+
+    #[test]
+    fn stand_values_default_to_muu_without_stand_summary() {
+        let row = species_row(1, Species::Kuusi);
+        let stands = vec![Stand {
+            standid: Some(1),
+            standnumber: Some(7),
+            cuttingtype: Some(5),
+            area: Some(2.0),
+            ..Stand::default()
+        }];
+
+        let values = build_stand_values(&[row], &[], &stands);
+        assert_eq!(values.len(), 1);
+        let value = &values[0];
+        assert_eq!(value.meanage, None);
+        assert!(matches!(value.fertility_class, FertilityClass::Muu));
+        assert!(matches!(value.main_group, MainGroup::Muu));
+        assert!(matches!(value.soil_type, SoilType::Muu));
+    }
+
+    #[test]
+    fn stand_values_without_area_have_no_costs() {
+        let row = species_row(1, Species::Kuusi);
+        let stands = vec![Stand {
+            standid: Some(1),
+            standnumber: Some(7),
+            cuttingtype: Some(5),
+            ..Stand::default()
+        }];
+
+        let values = build_stand_values(&[row], &[], &stands);
+        assert_eq!(values[0].area, None);
+        assert_close(values[0].costs_eur, 0.0);
+        assert_close(values[0].net_eur, values[0].income_eur);
+    }
+
+    #[test]
+    fn stand_values_are_ordered_by_standnumber_with_missing_last() {
+        let mut numbered = species_row(2, Species::Kuusi);
+        numbered.standnumber = Some(5);
+        let mut unnumbered = species_row(1, Species::Manty);
+        unnumbered.standnumber = None;
+
+        let stands = vec![
+            Stand {
+                standid: Some(1),
+                ..Stand::default()
+            },
+            Stand {
+                standid: Some(2),
+                standnumber: Some(5),
+                ..Stand::default()
+            },
+        ];
+
+        let values = build_stand_values(&[unnumbered, numbered], &[], &stands);
+        let standnumbers: Vec<Option<i64>> = values.iter().map(|row| row.standnumber).collect();
+        assert_eq!(standnumbers, vec![Some(5), None]);
+    }
+
+    #[test]
+    fn stand_values_split_rows_with_different_harvest_proposals() {
+        let mut first = species_row(1, Species::Kuusi);
+        first.cuttingproposalyear = Some(2030);
+        let mut second = species_row(1, Species::Manty);
+        second.cuttingproposalyear = Some(2031);
+
+        let stands = vec![Stand {
+            standid: Some(1),
+            standnumber: Some(7),
+            cuttingtype: Some(5),
+            area: Some(2.0),
+            ..Stand::default()
+        }];
+
+        let values = build_stand_values(&[first, second], &[], &stands);
+        assert_eq!(values.len(), 2);
+        let years: Vec<Option<i64>> = values.iter().map(|row| row.cuttingproposalyear).collect();
+        assert_eq!(years, vec![Some(2030), Some(2031)]);
+    }
+
+    // -----------------------------------------------------------------------
+    // build_raw_rows
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn raw_rows_join_strata_stand_and_summary() {
+        let strata = vec![filled_stratum(1, 2)];
+        let stands = vec![Stand {
+            standid: Some(1),
+            standnumber: Some(7),
+            cuttingtype: Some(3),
+            cuttingproposalyear: Some(2032),
+            area: Some(2.0),
+            ..Stand::default()
+        }];
+        let mut summary = stand_summary(1);
+        summary.fertility_class = Some(1);
+        summary.main_group = Some(3);
+        summary.soil_type = Some(60);
+
+        let rows = build_raw_rows(&strata, &stands, &[summary]).unwrap();
+        assert_eq!(rows.len(), 1);
+
+        let row = &rows[0];
+        assert_eq!(row.standid, 1);
+        assert_eq!(row.treespecies, 2);
+        assert_eq!(row.species, Species::Kuusi);
+        assert_eq!(row.standnumber, Some(7));
+        assert!(matches!(row.cutting, Some(Cutting::Harvennus)));
+        assert_eq!(row.cuttingproposalyear, Some(2032));
+        assert_eq!(row.age, Some(50.0));
+        assert_eq!(row.basalarea, Some(25.0));
+        assert_eq!(row.volume, Some(100.0));
+        assert_eq!(row.stembiomass, Some(200.0));
+        assert_eq!(row.leafbiomass, Some(10.0));
+        assert!(matches!(row.fertility_class, FertilityClass::Lehto));
+        assert!(matches!(row.main_group, MainGroup::Joutomaa));
+        assert!(matches!(row.soil_type, SoilType::Turvemaa));
+    }
+
+    #[test]
+    fn raw_rows_calculate_sawlog_percent_from_volumes() {
+        let mut stratum = filled_stratum(1, 2);
+        stratum.sawlogvolume = Some(30.0);
+        stratum.pulpwoodvolume = Some(70.0);
+
+        let rows = build_raw_rows(&[stratum], &[stand(1)], &[]).unwrap();
+        assert_close(rows[0].sawlogpercent.unwrap(), 30.0);
+
+        let mut pulp_only = filled_stratum(1, 2);
+        pulp_only.sawlogvolume = Some(0.0);
+        pulp_only.pulpwoodvolume = Some(50.0);
+        let rows = build_raw_rows(&[pulp_only], &[stand(1)], &[]).unwrap();
+        assert_close(rows[0].sawlogpercent.unwrap(), 0.0);
+    }
+
+    #[test]
+    fn raw_rows_are_none_when_volumes_are_missing() {
+        let mut stratum = filled_stratum(1, 2);
+        stratum.sawlogvolume = None;
+        stratum.pulpwoodvolume = None;
+
+        let rows = build_raw_rows(&[stratum], &[stand(1)], &[]).unwrap();
+        assert_eq!(rows[0].sawlogpercent, None);
+    }
+
+    #[test]
+    fn raw_rows_skip_strata_of_unknown_stands() {
+        let rows = build_raw_rows(&[filled_stratum(99, 1)], &[stand(1)], &[]).unwrap();
+        assert!(rows.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // compute_totals
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn totals_count_each_stand_once_and_scale_by_area() {
+        let stands = vec![
+            Stand {
+                standid: Some(1),
+                area: Some(2.0),
+                ..Stand::default()
+            },
+            Stand {
+                standid: Some(1),
+                area: Some(2.0),
+                ..Stand::default()
+            },
+            Stand {
+                standid: Some(2),
+                area: Some(3.0),
+                ..Stand::default()
+            },
+            Stand::default(),
+        ];
+
+        let mut value = stand_value();
+        value.standid = 1;
+        value.area = Some(2.0);
+        value.volume = 100.0;
+        value.sawlogvolume = 40.0;
+        value.pulpwoodvolume = 60.0;
+        value.volumegrowth = 10.0;
+        value.income_eur = 500.0;
+        value.costs_eur = 100.0;
+        value.net_eur = 400.0;
+
+        let totals = compute_totals(&stands, &[value.clone(), value]);
+        assert_eq!(
+            totals.stand_count, 2,
+            "kuvio lasketaan kerran riippumatta riveistä"
+        );
+        assert_close(totals.area_ha, 7.0);
+        assert_close(totals.volume_m3, 400.0);
+        assert_close(totals.sawlog_m3, 160.0);
+        assert_close(totals.pulpwood_m3, 240.0);
+        assert_close(totals.growth_m3_per_year, 40.0);
+        assert_close(totals.income_eur, 1000.0);
+        assert_close(totals.costs_eur, 200.0);
+        assert_close(totals.net_eur, 800.0);
+    }
+
+    #[test]
+    fn totals_of_empty_dataset_are_zero() {
+        let totals = compute_totals(&[], &[]);
+        assert_eq!(totals.stand_count, 0);
+        assert_eq!(totals.area_ha, 0.0);
+        assert_eq!(totals.net_eur, 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // create_dataset_summary
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn dataset_summary_contains_the_key_figures() {
+        let mut value = stand_value();
+        value.income_eur = 1000.0;
+        value.costs_eur = 200.0;
+        value.net_eur = 800.0;
+
+        let totals = Totals {
+            stand_count: 1,
+            area_ha: 1.5,
+            volume_m3: 100.0,
+            sawlog_m3: 40.0,
+            pulpwood_m3: 60.0,
+            growth_m3_per_year: 10.0,
+            income_eur: 1000.0,
+            costs_eur: 200.0,
+            net_eur: 800.0,
+        };
+
+        let summary = create_dataset_summary(&[value], &109.0, &totals);
+        assert!(summary.contains("Yhteenveto"));
+        assert!(summary.contains("1,50 ha"));
+        assert!(summary.contains("100,00 m³"));
+        assert!(summary.contains("40,00 m³"));
+        assert!(summary.contains("60,00 m³"));
+        assert!(summary.contains("1000.00 €"));
+        assert!(summary.contains("200.00 €"));
+        assert!(summary.contains("109.00 €"));
+        // 800 - 109 = 691, positiivinen arvo värjätään vihreäksi
+        assert!(summary.contains("691"));
+        assert!(summary.contains(GREEN));
+        assert!(!summary.contains(RED));
+    }
+
+    #[test]
+    fn dataset_summary_marks_a_negative_value_red() {
+        let mut value = stand_value();
+        value.net_eur = -1000.0;
+
+        let totals = Totals {
+            stand_count: 1,
+            ..Totals::default()
+        };
+
+        let summary = create_dataset_summary(&[value], &0.0, &totals);
+        assert!(summary.contains(RED));
+        assert!(!summary.contains(GREEN));
+        assert!(summary.contains("-1 000"));
     }
 }

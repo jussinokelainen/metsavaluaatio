@@ -519,10 +519,268 @@ mod tests {
     }
 
     #[test]
+    fn price_list_is_species_and_cutting_specific() {
+        assert_eq!(
+            PRICES.get(Species::Manty, TimberType::Tukki, Cutting::Uudistus),
+            80.37
+        );
+        assert_eq!(
+            PRICES.get(Species::Manty, TimberType::Kuitu, Cutting::Harvennus),
+            21.89
+        );
+        assert_eq!(
+            PRICES.get(Species::Kuusi, TimberType::Tukki, Cutting::Ensiharvennus),
+            60.19
+        );
+        assert_eq!(
+            PRICES.get(Species::Kuusi, TimberType::Kuitu, Cutting::Uudistus),
+            29.22
+        );
+        assert_eq!(
+            PRICES.get(Species::Koivu, TimberType::Tukki, Cutting::Harvennus),
+            53.70
+        );
+        assert_eq!(
+            PRICES.get(Species::Koivu, TimberType::Kuitu, Cutting::Ensiharvennus),
+            16.62
+        );
+    }
+
+    #[test]
+    fn unknown_species_have_no_price() {
+        for cutting in [
+            Cutting::Uudistus,
+            Cutting::Harvennus,
+            Cutting::Ensiharvennus,
+        ] {
+            for timber in [TimberType::Tukki, TimberType::Kuitu] {
+                assert_eq!(PRICES.get(Species::Muu, timber, cutting), 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn sawlog_is_more_expensive_than_pulpwood() {
+        for species in [Species::Manty, Species::Kuusi, Species::Koivu] {
+            for cutting in [
+                Cutting::Uudistus,
+                Cutting::Harvennus,
+                Cutting::Ensiharvennus,
+            ] {
+                assert!(
+                    PRICES.get(species, TimberType::Tukki, cutting)
+                        > PRICES.get(species, TimberType::Kuitu, cutting)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn soil_type_codes_map_to_their_names() {
+        assert_eq!(
+            SoilType::from_opt_code(Some(10)).name(),
+            "Keskikarkea tai karkea kangasmaa"
+        );
+        assert_eq!(SoilType::from_opt_code(Some(11)).name(), "Karkea moreeni");
+        assert_eq!(SoilType::from_opt_code(Some(24)).name(), "Savimaa");
+        assert_eq!(SoilType::from_opt_code(Some(60)).name(), "Turvemaa");
+        assert_eq!(
+            SoilType::from_opt_code(Some(791)).name(),
+            "Mustikkaturvekangas (I)"
+        );
+        assert_eq!(
+            SoilType::from_opt_code(Some(796)).name(),
+            "Varputurvekangas"
+        );
+    }
+
+    #[test]
+    fn unknown_soil_type_codes_are_muu() {
+        assert_eq!(SoilType::from_opt_code(None).name(), "Muu");
+        assert_eq!(SoilType::from_opt_code(Some(0)).name(), "Muu");
+        assert_eq!(SoilType::from_opt_code(Some(9999)).name(), "Muu");
+    }
+
+    #[test]
+    fn every_soil_type_code_is_mapped() {
+        for (code, name) in [
+            (10, "Keskikarkea tai karkea kangasmaa"),
+            (11, "Karkea moreeni"),
+            (12, "Karkea lajittunut maalaji"),
+            (20, "Hienojakoinen kangasmaa"),
+            (21, "Hienojakoinen moreeni"),
+            (22, "Hienojakoinen lajittunut maalaji"),
+            (23, "Silttipitoinen maalaji"),
+            (24, "Savimaa"),
+            (30, "Kivinen Keskikarkea tai karkea kangasmaa"),
+            (31, "Kivinen karkea moreeni"),
+            (32, "Kivinen karkea lajittunut maalaji"),
+            (40, "Kivinen hienojakoinen kangasmaa"),
+            (60, "Turvemaa"),
+            (61, "Saraturve"),
+            (62, "Rahkaturve"),
+            (63, "Puuvaltainen turve"),
+            (64, "Eroosioherkkä saraturve (von Post luokka yli 5)"),
+            (65, "Eroosioherkkä rahkaturve (von Post luokka yli 5)"),
+            (66, "Maatumaton saraturve (von Post luokka enintään 5)"),
+            (67, "Maatumaton rahkaturve (von Post enintään 5)"),
+            (791, "Mustikkaturvekangas (I)"),
+            (792, "Mustikkaturvekangas (II)"),
+            (793, "Puolukkaturvekangas (I)"),
+            (794, "Puolukkaturvekangas (II)"),
+            (795, "Ruohoturvekangas"),
+            (796, "Varputurvekangas"),
+        ] {
+            assert_eq!(
+                SoilType::from_opt_code(Some(code)).name(),
+                name,
+                "maalajikoodi {code}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_fertility_class_code_is_mapped() {
+        for (code, name) in [
+            (1, "Lehto tai vastaava suo"),
+            (2, "Lehtomainen kangas tai vastaava suo"),
+            (3, "Tuore kangas tai vastaava suo"),
+            (4, "Kuivahko kangas tai vastaava suo"),
+            (5, "Kuiva kangas tai vastaava suo"),
+            (6, "Karukko kangas tai vastaava suo"),
+            (7, "Kalliomaa ja hietikko"),
+            (8, "Lakimaa ja tunturi"),
+            (9, "Kuivahko kangas tai sitä karumpi, paperi-ilmoitukset."),
+            (10, "Tuore kangas tai sitä rehevämpi, paperi-ilmoitukset."),
+        ] {
+            assert_eq!(
+                FertilityClass::from_opt_code(Some(code)).name(),
+                name,
+                "käsittelykykyyskoodi {code}"
+            );
+        }
+        assert_eq!(FertilityClass::from_opt_code(Some(11)).name(), "Muu");
+        assert_eq!(FertilityClass::from_opt_code(None).name(), "Muu");
+    }
+
+    #[test]
+    fn main_group_codes_map_to_their_names() {
+        assert_eq!(MainGroup::from_opt_code(Some(1)).name(), "Metsämaa");
+        assert_eq!(MainGroup::from_opt_code(Some(2)).name(), "Kitumaa");
+        assert_eq!(MainGroup::from_opt_code(Some(3)).name(), "Joutomaa");
+        assert_eq!(
+            MainGroup::from_opt_code(Some(4)).name(),
+            "Muu metsätalousmaa"
+        );
+        assert_eq!(MainGroup::from_opt_code(Some(5)).name(), "Muu");
+        assert_eq!(MainGroup::from_opt_code(None).name(), "Muu");
+    }
+
+    #[test]
+    fn fertility_class_codes_map_to_their_names() {
+        assert_eq!(
+            FertilityClass::from_opt_code(Some(1)).name(),
+            "Lehto tai vastaava suo"
+        );
+        assert_eq!(
+            FertilityClass::from_opt_code(Some(5)).name(),
+            "Kuiva kangas tai vastaava suo"
+        );
+        assert_eq!(
+            FertilityClass::from_opt_code(Some(7)).name(),
+            "Kalliomaa ja hietikko"
+        );
+        assert_eq!(
+            FertilityClass::from_opt_code(Some(10)).name(),
+            "Tuore kangas tai sitä rehevämpi, paperi-ilmoitukset."
+        );
+        assert_eq!(FertilityClass::from_opt_code(Some(11)).name(), "Muu");
+        assert_eq!(FertilityClass::from_opt_code(None).name(), "Muu");
+    }
+
+    #[test]
+    fn every_enum_variant_has_a_name() {
+        let soils = [
+            SoilType::Keskikarkea,
+            SoilType::KarkeaMoreeni,
+            SoilType::KarkeaLajittunut,
+            SoilType::HienojakoinenKangasmaa,
+            SoilType::HienojakoinenMoreeni,
+            SoilType::HienojakoinenLajittunut,
+            SoilType::Silttipitoinen,
+            SoilType::Savimaa,
+            SoilType::KivinenKeskikarkeaKangas,
+            SoilType::KivinenKarkeaMoreeni,
+            SoilType::KivinenKarkeaLajittunut,
+            SoilType::KivinenHieno,
+            SoilType::Turvemaa,
+            SoilType::SaraTurve,
+            SoilType::RahkaTurve,
+            SoilType::PuuvaltainenTurve,
+            SoilType::EroosioherkkäSara,
+            SoilType::EroosioherkkäRahka,
+            SoilType::MaatumatonSara,
+            SoilType::MaatumatonRahka,
+            SoilType::MustikkaKangasI,
+            SoilType::MustikkaKangasII,
+            SoilType::PuolukkaKangasI,
+            SoilType::PuolukkaKangasII,
+            SoilType::RuohoTurveKangas,
+            SoilType::VarpuTurveKangas,
+            SoilType::Muu,
+        ];
+        for soil in soils {
+            assert!(!soil.name().is_empty(), "missing name for {soil:?}");
+        }
+
+        let groups = [
+            MainGroup::MetsaMaa,
+            MainGroup::KituMaa,
+            MainGroup::Joutomaa,
+            MainGroup::MuuMetsaTalous,
+            MainGroup::Muu,
+        ];
+        for group in groups {
+            assert!(!group.name().is_empty(), "missing name for {group:?}");
+        }
+
+        let fertility = [
+            FertilityClass::Kalliomaa,
+            FertilityClass::KangasKarukko,
+            FertilityClass::KangasKuiva,
+            FertilityClass::KangasKuivahko,
+            FertilityClass::KangasKuivahkoTaiKaru,
+            FertilityClass::KangasLehtomainen,
+            FertilityClass::KangasTuore,
+            FertilityClass::KangasTuoreTaiReheva,
+            FertilityClass::Lakimaa,
+            FertilityClass::Lehto,
+            FertilityClass::Muu,
+        ];
+        for class in fertility {
+            assert!(!class.name().is_empty(), "missing name for {class:?}");
+        }
+    }
+
+    #[test]
+    fn value_limits_are_ordered_by_harvest_type() {
+        // Päätehakkuun ikäraja on aina harvennusta korkeampi
+        for (uudistus, harvennus) in [
+            (&LIMITS.uudistus.kuusi, &LIMITS.harvennus.kuusi),
+            (&LIMITS.uudistus.manty, &LIMITS.harvennus.manty),
+            (&LIMITS.uudistus.koivu, &LIMITS.harvennus.koivu),
+        ] {
+            assert!(uudistus.age > harvennus.age);
+            assert!(uudistus.diameter > harvennus.diameter);
+        }
+    }
+
+    #[test]
     fn names_are_human_readable() {
         assert_eq!(Species::Manty.name(), "Mänty");
         assert_eq!(Species::Kuusi.name(), "Kuusi");
         assert_eq!(Species::Koivu.name(), "Koivu");
+        assert_eq!(Species::Muu.name(), "Muu");
         assert_eq!(TimberType::Kuitu.name(), "kuitu");
         assert_eq!(TimberType::Tukki.name(), "tukki");
         assert_eq!(Cutting::Uudistus.name(), "uudistus");
