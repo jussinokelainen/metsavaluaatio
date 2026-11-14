@@ -1,6 +1,8 @@
 METSÄVALUAATIO
 ==============
 
+GUI-versio ohjelmasta: https://github.com/jussinokelainen/metsavaluaatio-gui
+
 Asennus
 -------
 
