@@ -45,7 +45,7 @@ EOF
 cp ./metsavaluaatio.rb ./homebrew-metsavaluaatio/Formula/metsavaluaatio.rb
 echo "Formula files updated."
 
-message="Updated to version $VERSION"
+message="Updated CLI to version $VERSION"
 printf "Commit new metsavaluaatio.rb in homebrew-metsavaluaatio with message '\e[32m%s\e[0m'?" "$message"
 read -p " [y/n] " -r
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
