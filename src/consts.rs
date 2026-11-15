@@ -360,38 +360,38 @@ impl PriceList {
 pub const PRICES: PriceList = PriceList {
     manty: WoodPrices {
         tukki: CuttingPrices {
-            uudistus: 80.37,
-            harvennus: 68.83,
-            ensiharvennus: 57.24,
+            uudistus: 78.08,
+            harvennus: 69.50,
+            ensiharvennus: 52.04,
         },
         kuitu: CuttingPrices {
-            uudistus: 28.81,
-            harvennus: 21.89,
-            ensiharvennus: 15.95,
+            uudistus: 29.14,
+            harvennus: 26.42,
+            ensiharvennus: 21.45,
         },
     },
     kuusi: WoodPrices {
         tukki: CuttingPrices {
-            uudistus: 85.01,
-            harvennus: 71.73,
-            ensiharvennus: 60.19,
+            uudistus: 80.05,
+            harvennus: 70.62,
+            ensiharvennus: 51.41,
         },
         kuitu: CuttingPrices {
-            uudistus: 29.22,
-            harvennus: 21.75,
-            ensiharvennus: 15.95,
+            uudistus: 30.47,
+            harvennus: 27.43,
+            ensiharvennus: 22.19,
         },
     },
     koivu: WoodPrices {
         tukki: CuttingPrices {
-            uudistus: 62.94,
-            harvennus: 53.70,
-            ensiharvennus: 39.74,
+            uudistus: 63.53,
+            harvennus: 53.94,
+            ensiharvennus: 41.35,
         },
         kuitu: CuttingPrices {
-            uudistus: 25.46,
-            harvennus: 21.71,
-            ensiharvennus: 16.62,
+            uudistus: 29.79,
+            harvennus: 27.00,
+            ensiharvennus: 21.59,
         },
     },
 };
@@ -546,27 +546,27 @@ mod tests {
     fn price_list_is_species_and_cutting_specific() {
         assert_eq!(
             PRICES.get(Species::Manty, TimberType::Tukki, Cutting::Uudistus),
-            80.37
+            78.08
         );
         assert_eq!(
             PRICES.get(Species::Manty, TimberType::Kuitu, Cutting::Harvennus),
-            21.89
+            26.42
         );
         assert_eq!(
             PRICES.get(Species::Kuusi, TimberType::Tukki, Cutting::Ensiharvennus),
-            60.19
+            51.41
         );
         assert_eq!(
             PRICES.get(Species::Kuusi, TimberType::Kuitu, Cutting::Uudistus),
-            29.22
+            30.47
         );
         assert_eq!(
             PRICES.get(Species::Koivu, TimberType::Tukki, Cutting::Harvennus),
-            53.70
+            53.94
         );
         assert_eq!(
             PRICES.get(Species::Koivu, TimberType::Kuitu, Cutting::Ensiharvennus),
-            16.62
+            21.59
         );
     }
 

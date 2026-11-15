@@ -237,9 +237,9 @@ fn harvennus(species: Species, sawlog: f64, pulpwood: f64, area: f64) -> f64 {
     // area * volume * 0.25 * PRICES.get(species, TimberType::Kuitu, Cutting::Harvennus)
     //     + area * sawlog * 0.15 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus)
     let sawlog_value =
-        area * pulpwood * 0.3 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus);
-    let pulp_value =
         area * sawlog * 0.1 * PRICES.get(species, TimberType::Tukki, Cutting::Harvennus);
+    let pulp_value =
+        area * pulpwood * 0.3 * PRICES.get(species, TimberType::Kuitu, Cutting::Harvennus);
     sawlog_value + pulp_value
 }
 
@@ -1259,7 +1259,7 @@ mod tests {
             pulpwoodvolume: 20.0,
             ..row()
         };
-        assert_close(calculate_value(&summary), 1034.925);
+        assert_close(calculate_value(&summary), 1022.7);
     }
 
     #[test]
@@ -1271,7 +1271,7 @@ mod tests {
             ..row()
         };
         // Huomaa: myös kuitu lasketaan tukkihinnalla
-        assert_close(calculate_value(&summary), 481.81);
+        assert_close(calculate_value(&summary), 228.02);
     }
 
     #[test]
@@ -1286,7 +1286,7 @@ mod tests {
             pulpwoodvolume: 20.0,
             ..row()
         };
-        assert_close(calculate_value(&final_felling), 1075.875);
+        assert_close(calculate_value(&final_felling), 1057.425);
 
         // ...tai kun ikä ja läpimitta ylittävät rajat
         let old_tree = SpeciesSummary {
@@ -1298,7 +1298,7 @@ mod tests {
             pulpwoodvolume: 20.0,
             ..row()
         };
-        assert_close(calculate_value(&old_tree), 1075.875);
+        assert_close(calculate_value(&old_tree), 1057.425);
     }
 
     #[test]
@@ -1313,7 +1313,7 @@ mod tests {
             pulpwoodvolume: 20.0,
             ..row()
         };
-        assert_close(calculate_value(&thinning), 502.11);
+        assert_close(calculate_value(&thinning), 235.20);
 
         // Liian matala puu ei täytä harvennusrajoja
         let too_short = SpeciesSummary {
@@ -1332,19 +1332,19 @@ mod tests {
             pulpwoodvolume: 20.0,
             ..row()
         };
-        assert_close(calculate_value(&manty), 1034.925);
+        assert_close(calculate_value(&manty), 1022.7);
 
         let kuusi = SpeciesSummary {
             species: Species::Kuusi,
             ..manty.clone()
         };
-        assert_close(calculate_value(&kuusi), 1075.875);
+        assert_close(calculate_value(&kuusi), 1057.425);
 
         let koivu = SpeciesSummary {
             species: Species::Koivu,
             ..manty
         };
-        assert_close(calculate_value(&koivu), 853.95);
+        assert_close(calculate_value(&koivu), 923.325);
     }
 
     #[test]

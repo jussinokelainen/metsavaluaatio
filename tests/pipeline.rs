@@ -229,8 +229,8 @@ fn full_pipeline_from_property_to_exports() {
     assert_close(first.pulpwoodvolume, 90.0);
     // 1,5 ha * 0,75 * (90 kuitua + 60 tukkia) * 0,5 €/m³ + 1,5 ha * (720 + 1120) €/ha
     assert_close(first.costs_eur, 2844.375);
-    // 1,5 * 60 * 0,75 * 85,01 + 1,5 * 90 * 0,75 * 29,22
-    assert_close(first.income_eur, 8696.7);
+    // 1,5 * 60 * 0,75 * 80,05 + 1,5 * 90 * 0,75 * 30,47
+    assert_close(first.income_eur, 8488.4625);
     assert_close(first.net_eur, first.income_eur - first.costs_eur);
     assert!(matches!(
         first.fertility_class,
@@ -242,8 +242,8 @@ fn full_pipeline_from_property_to_exports() {
     assert!(matches!(second.cutting, Some(Cutting::Harvennus)));
     assert_eq!(second.area, Some(0.5));
     assert_close(second.volume, 120.0);
-    // 0,5 * 80 * 0,3 * 68,83 + 0,5 * 40 * 0,1 * 68,83
-    assert_close(second.income_eur, 963.62);
+    // 0,5 * 80 * 0,3 * 21.89 + 0,5 * 40 * 0,1 * 69,50
+    assert_close(second.income_eur, 456.04);
     // 0,5 * (80 * 0,3 + 40 * 0,1) * 0,5 + 0,5 * 396
     assert_close(second.costs_eur, 205.0);
 
@@ -258,7 +258,7 @@ fn full_pipeline_from_property_to_exports() {
     assert_eq!(totals.stand_count, 2);
     assert_close(totals.area_ha, 2.0);
     assert_close(totals.volume_m3, 150.0 * 1.5 + 120.0 * 0.5);
-    assert_close(totals.income_eur, 8696.7 + 963.62);
+    assert_close(totals.income_eur, 8944.5025);
 
     // 5. Konsoliyhteenveto
     let summary = valuation::create_dataset_summary(&stand_values, &fixed_costs, &totals);
@@ -269,7 +269,7 @@ fn full_pipeline_from_property_to_exports() {
     assert!(summary.contains("175,00 m³"), "kuitumäärä");
     assert!(summary.contains("LASKENNALLINEN ARVO"));
     // 6 610,825 netto - 1 818 kiinteät kulut -> 4 793 pyöristettynä
-    assert!(summary.contains("4 793"));
+    assert!(summary.contains("4 077"));
 
     // 6. KML-tason luonti
     let kml = maps::generate_kml(&features, &property_geometry, &stand_values).unwrap();
