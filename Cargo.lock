@@ -1259,9 +1259,9 @@ dependencies = [
  "dirs",
  "geo",
  "geojson",
+ "metsaval 1.0.0",
  "minidom",
  "proj",
- "quick-xml",
  "rand",
  "reqwest",
  "rusqlite",
@@ -1270,6 +1270,26 @@ dependencies = [
  "serde_json",
  "tokio",
  "toml",
+ "zip 9.0.1",
+]
+
+[[package]]
+name = "metsaval"
+version = "1.0.0"
+source = "git+https://github.com/jussinokelainen/metsavaluaatio-core.git?tag=1.0.0#70ed6c7729c9af1fe9fc7b5ff529519128dd56c1"
+dependencies = [
+ "color-eyre",
+ "geo",
+ "geojson",
+ "minidom",
+ "proj",
+ "rand",
+ "reqwest",
+ "rusqlite",
+ "rust_xlsxwriter",
+ "serde",
+ "serde_json",
+ "tokio",
  "zip 9.0.1",
 ]
 
@@ -1447,15 +1467,6 @@ dependencies = [
  "link-cplusplus",
  "pkg-config",
  "tar",
-]
-
-[[package]]
-name = "quick-xml"
-version = "0.42.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41b1177fdf999d2321d3fb46ff47159d9c1fb9ad66a4879f8c50a0b504615e9b"
-dependencies = [
- "memchr",
 ]
 
 [[package]]

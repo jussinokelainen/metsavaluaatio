@@ -55,4 +55,5 @@ fi
 cd ./homebrew-metsavaluaatio/ || exit
 git add ./Formula/metsavaluaatio.rb
 git commit -m "$message"
+git pull --rebase
 git push
